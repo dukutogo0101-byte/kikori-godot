@@ -8,6 +8,8 @@ python3 -c 'import re,sys; from pathlib import Path; sys.exit(bool(re.search("SC
 "$GODOT_BIN" --headless --path . --script tests/test_simulation.gd 2>&1 | tee reports/simulation.log
 "$GODOT_BIN" --headless --path . -- --smoke-test 2>&1 | tee reports/scene.log
 python3 -c 'import re,sys; from pathlib import Path; sys.exit(bool(re.search("SCRIPT ERROR|^ERROR:", Path("reports/scene.log").read_text(), re.M)))'
+"$GODOT_BIN" --headless --path . --script tests/test_scene.gd -- --smoke-test 2>&1 | tee reports/scene-events.log
+python3 -c 'import re,sys; from pathlib import Path; sys.exit(bool(re.search("SCRIPT ERROR|^ERROR:", Path("reports/scene-events.log").read_text(), re.M)))'
 "$GODOT_BIN" --headless --path . --export-release Web build/web/index.html 2>&1 | tee reports/export.log
 test -s build/web/index.html
 test -s build/web/index.wasm

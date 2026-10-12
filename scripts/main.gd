@@ -39,6 +39,10 @@ var touches: Dictionary = {}
 var pinch_distance = 0.0
 var last_gesture = Vector2.ZERO
 var hidden_at = 0.0
+var process_calls = 0
+var last_delta = 0.0
+var web_document: JavaScriptObject
+var visibility_callback: JavaScriptObject
 var effect_nodes: Array = []
 var font: Font
 var native_smoke_test = false
@@ -74,12 +78,15 @@ func _ready() -> void:
 		_show_tutorial()
 	if OS.has_feature("web"):
 		JavaScriptBridge.eval("window.kikoriReady = true;", true)
-		# The visibility hook signals synchronously; the next game tick saves/pauses.
-		JavaScriptBridge.eval("window.kikoriHidden=false;document.addEventListener('visibilitychange',function(){window.kikoriHidden=document.hidden;});", true)
+		# Retain the callback and read the real document state. Avoid JS eval every frame.
+		web_document = JavaScriptBridge.get_interface("document")
+		visibility_callback = JavaScriptBridge.create_callback(_on_web_visibility)
+		web_document.addEventListener("visibilitychange", visibility_callback)
+		_on_web_visibility([])
 		get_tree().create_timer(0.2).timeout.connect(_save_browser_debug)
 	if native_smoke_test:
 		print("KIKORI_SCENE_READY trees=%d workers=%d" % [tree_nodes.size(), worker_nodes.size()])
-		get_tree().create_timer(2).timeout.connect(func(): get_tree().quit())
+		get_tree().create_timer(2).timeout.connect(func(): print("AUTO_PROCESS elapsed=", sim.elapsed, " enabled=", is_processing(), " acc=", accumulator, " paused=", paused); get_tree().quit())
 
 func _mesh(parent: Node3D, mesh: Mesh, p: Vector3 = Vector3.ZERO) -> MeshInstance3D:
 	var instance = MeshInstance3D.new()
@@ -95,14 +102,14 @@ func _build_world() -> void:
 	env.background_color = Color("b9dbd9")
 	env.ambient_light_source = Environment.AMBIENT_SOURCE_COLOR
 	env.ambient_light_color = Color("e9f0d9")
-	env.ambient_light_energy = 0.65
+	env.ambient_light_energy = 0.55
 	env.tonemap_mode = Environment.TONE_MAPPER_LINEAR
 	environment_node.environment = env
 	add_child(environment_node)
 	var sun = DirectionalLight3D.new()
 	sun.rotation_degrees = Vector3(-55, -28, 0)
 	sun.light_color = Color("fff1d2")
-	sun.light_energy = 1.05
+	sun.light_energy = 0.9
 	sun.shadow_enabled = true
 	sun.directional_shadow_max_distance = 45
 	sun.directional_shadow_mode = DirectionalLight3D.SHADOW_ORTHOGONAL
@@ -167,23 +174,11 @@ func _build_world() -> void:
 	add_child(music_player)
 
 func _process(delta: float) -> void:
-	if OS.has_feature("web"):
-		var hidden = JavaScriptBridge.eval("window.kikoriHidden === true") == true
-		if hidden and not paused:
-			_save()
-			hidden_at = Time.get_unix_time_from_system()
-			paused = true
-		elif not hidden and paused:
-			var before = sim.money
-			sim.advance(clampf(Time.get_unix_time_from_system() - hidden_at, 0, 600))
-			paused = false
-			accumulator = 0
-			if sim.money > before:
-				_toast("留守中の売上 +%s" % _amount(sim.money - before))
-			_save()
+	process_calls += 1
+	last_delta = delta
 	if paused:
 		return
-	var dt = minf(delta, 0.25)
+	var dt = minf(delta, 1.0)
 	animation_clock += dt
 	accumulator += dt
 	while accumulator >= 0.1:
@@ -480,7 +475,7 @@ func _resize() -> void:
 	mission_label.position = Vector2(24, 183)
 	mission_label.size = Vector2(w - 48, 20)
 	var bottom = hud.get_node("Bottom") as Control
-	var bottom_height = 319.0
+	var bottom_height = 355.0
 	if w > h * 1.15:
 		bottom.position = Vector2(w - 330, 18)
 		bottom.size = Vector2(312, minf(bottom_height, h - 36))
@@ -508,7 +503,7 @@ func _update_camera() -> void:
 	camera.position = target + offset
 	camera.look_at(target)
 	# Lift the island into the available area above the bottom sheet.
-	camera.v_offset = -0.8 if landscape else -2.4
+	camera.v_offset = -0.8 if landscape else -3.7
 	camera.h_offset = 3.4 if landscape else 0.0
 
 func _update_hud() -> void:
@@ -571,7 +566,7 @@ func _save() -> void:
 func _save_browser_debug() -> void:
 	if OS.has_feature("web"):
 		# Read-only diagnostics for automated real-browser smoke tests. No game mutation.
-		var summary = {"money": sim.money, "processed": sim.processed, "felled": sim.felled, "levels": sim.levels, "elapsed": sim.elapsed, "fps": Engine.get_frames_per_second(),
+		var summary = {"money": sim.money, "processed": sim.processed, "felled": sim.felled, "levels": sim.levels, "elapsed": sim.elapsed, "fps": Engine.get_frames_per_second(), "calls": process_calls, "delta": last_delta, "paused": paused, "processing": is_processing(),
 			"cargo": sim.cargo.size(), "ground": sim.ground_logs.size(), "mill": sim.mill_stock, "saved": store.available}
 		JavaScriptBridge.eval("window.kikoriState = %s;" % JSON.stringify(summary), true)
 		var size = get_viewport().get_visible_rect().size
@@ -668,3 +663,22 @@ func _notification(what: int) -> void:
 	if what == NOTIFICATION_WM_CLOSE_REQUEST or what == NOTIFICATION_APPLICATION_FOCUS_OUT:
 		if save_label != null:
 			_save()
+
+func _on_web_visibility(_arguments: Array) -> void:
+	var hidden = bool(web_document.hidden)
+	if hidden and not paused:
+		_save()
+		hidden_at = Time.get_unix_time_from_system()
+		paused = true
+	elif not hidden and paused:
+		var before = sim.money
+		sim.advance(clampf(Time.get_unix_time_from_system() - hidden_at, 0, 600))
+		paused = false
+		accumulator = 0
+		if sim.money > before:
+			_toast("留守中の売上 +%s" % _amount(sim.money - before))
+		_save()
+
+func _exit_tree() -> void:
+	if web_document != null and visibility_callback != null:
+		web_document.removeEventListener("visibilitychange", visibility_callback)
