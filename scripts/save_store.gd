@@ -9,7 +9,7 @@ var message = ""
 func read_save() -> Dictionary:
 	var raw = ""
 	if OS.has_feature("web"):
-		var result = JavaScriptBridge.eval("(function(){try{return localStorage.getItem('%s') || '';}catch(e){return '__UNAVAILABLE__';}})()" % KEY)
+		var result = JavaScriptBridge.eval("(function(){try{return localStorage.getItem('%s') || '';}catch(e){return '__UNAVAILABLE__';}})()" % KEY, true)
 		if result is String:
 			raw = result
 		if raw == "__UNAVAILABLE__":
@@ -36,7 +36,7 @@ func write_save(state: Dictionary) -> bool:
 	if OS.has_feature("web"):
 		# JSON.stringify of a string is a safe JS literal, including user-controlled text.
 		var script = "(function(){try{localStorage.setItem('%s', %s);return true;}catch(e){return false;}})()" % [KEY, JSON.stringify(raw)]
-		available = JavaScriptBridge.eval(script) == true
+		available = JavaScriptBridge.eval(script, true) == true
 	else:
 		var file = FileAccess.open(FILE + ".tmp", FileAccess.WRITE)
 		available = file != null

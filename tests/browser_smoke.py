@@ -8,11 +8,23 @@ Real device certification is a separate manual check.
 import argparse
 import base64
 import json
+import os
 from pathlib import Path
+import sys
 import threading
 from functools import partial
 from http.server import SimpleHTTPRequestHandler, ThreadingHTTPServer
 from playwright.sync_api import sync_playwright
+
+
+def emit_preview(name, content):
+    # Xvfb/driver pipes may be nonblocking. Small blocking writes avoid truncating PNGs.
+    os.set_blocking(sys.stdout.fileno(), True)
+    encoded = base64.b64encode(content).decode()
+    print("KIKORI_PREVIEW_BEGIN " + name, flush=True)
+    for offset in range(0, len(encoded), 2048):
+        print("KIKORI_PREVIEW_DATA " + name + " " + encoded[offset:offset + 2048], flush=True)
+    print("KIKORI_PREVIEW_END " + name, flush=True)
 
 
 def inspect_browser(browser, url, name):
@@ -37,7 +49,7 @@ def inspect_browser(browser, url, name):
     page.wait_for_function("window.kikoriState && window.kikoriState.saved", timeout=15000)
     preview = page.screenshot(path=f"reports/{name}-portrait.png")
     # Inline diagnostic lets repository-only clients review the rendered scene.
-    print("KIKORI_PREVIEW " + name + " " + base64.b64encode(preview).decode(), flush=True)
+    emit_preview(name, preview)
     # Rush and wait for the full physical production loop; diagnostics are read-only.
     tap("boost")
     try:
@@ -45,7 +57,7 @@ def inspect_browser(browser, url, name):
     except Exception:
         print("KIKORI_TIMEOUT_STATE", page.evaluate("({state:window.kikoriState,ui:window.kikoriUi,hidden:document.hidden})"), flush=True)
         preview = page.screenshot(path=f"reports/{name}-failure.png")
-        print("KIKORI_PREVIEW failure " + base64.b64encode(preview).decode(), flush=True)
+        emit_preview("failure", preview)
         raise
     before = page.evaluate("window.kikoriState")
     tap("wood")
@@ -90,7 +102,9 @@ def main():
         with sync_playwright() as playwright:
             engines = ["chromium", "webkit"] if args.engine == "all" else [args.engine]
             for engine in engines:
-                options = {"headless": True}
+                # GTK WebKit's headless screenshot path has a Mesa framebuffer issue.
+                # CI runs the normal WebKit window under Xvfb instead.
+                options = {"headless": engine != "webkit"}
                 if engine == "chromium":
                     options["args"] = ["--enable-webgl", "--use-gl=angle", "--use-angle=swiftshader", "--enable-unsafe-swiftshader"]
                 browser = getattr(playwright, engine).launch(**options)
