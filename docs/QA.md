@@ -2,14 +2,16 @@
 
 ## Confirmed locally
 
-- Godot 4.5.2 Compatibility project imports and the complete game scene starts headlessly.
+- The Godot 4 project imports and starts headlessly using the local 4.6.3 editor. CI builds and tests the pinned 4.5.2 release.
 - Deterministic economy suite: **815 assertions, 0 failures**.
 - Simulation covers production, regeneration, purchases, maximum levels, cooldown, conserved log counts, bounded stock, save validation/round-trip, capped offline progress and one hour of maximum upgrades.
 - Python tooling compiles. Original assets and font provenance documented.
 
 ## Automated CI checks
 
-GitHub Actions records the result of actual release Web export and Chromium/WebKit runs. Do not interpret the existence of a workflow as a passing result. See the Actions run and its `kikori-test-reports` artifact for current status and screenshots.
+The release Web export, all 815 simulation assertions, scene event checks, and Chromium/WebKit end-to-end tests passed in [Actions run 38229554117](https://github.com/dukutogo0101-byte/kikori-godot/actions/runs/38229554117). Both browser engines reported zero console/page errors and `gl.getError() == 0`; touch purchases, revenue, reload persistence, rotation and corrupt-save recovery passed. The exported payload is approximately 38.5 MB before compression (9.6 MB zipped).
+
+After deployment, the workflow repeats the browser checks against the actual public HTTPS URL. See the latest Actions run and its `kikori-live-reports` artifact for publication verification. These tests use software-rendered browser engines, so their frame rates do not measure mobile-device performance.
 
 ## Real device acceptance checklist (pending physical devices)
 

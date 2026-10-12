@@ -2,7 +2,7 @@
 
 Godot 4.5.2で作る、スマホブラウザ向け3D木こり経営ゲーム。小さな森林のジオラマを眺めながら、伐採 → 丸太の運搬 → 製材 → 売上 → 設備強化の循環を育てます。
 
-公開先（Pagesのデプロイ完了後）： **https://dukutogo0101-byte.github.io/kikori-godot/**
+遊べるURL： **https://dukutogo0101-byte.github.io/kikori-godot/**
 
 [自動ビルド・テスト・公開の状況](https://github.com/dukutogo0101-byte/kikori-godot/actions/workflows/web.yml)
 
@@ -31,7 +31,7 @@ Godot 4.5.2で作る、スマホブラウザ向け3D木こり経営ゲーム。�
 
 Linux x86_64、Python 3、Node.js 18以降、Godot 4.5.2、Webエクスポートテンプレートが必要です。
 
-3Dは80%の解像度で描画して拡大し、UIの解像度は維持します。GodotのWebKit向け描画で起きる、同一バッファ・同一範囲への不要なコピーだけを防ぐ回避処理を適用しています。通常のコピーとエラー検出は維持します。[上流の報告](https://github.com/godotengine/godot/issues/122816)を参照してください。
+3Dは80%の解像度で描画して拡大し、UIの解像度は維持します。GodotのWebKit向け描画で起きる画面出力時のフレームバッファエラーには、最終画面のコピーを専用シェーダーで行う回避処理を適用しています。GPUの状態を復元し、それ以外のコピーとエラー検出は維持します。[上流の報告](https://github.com/godotengine/godot/issues/122816)を参照してください。
 
 ```bash
 # 初回のみ：公式配布を取得し、SHA-256で検証します。
@@ -68,7 +68,7 @@ Chrome/WebKitのCIは実機の代わりにはなりません。実機チェッ�
 
 ## GitHub Pages
 
-`main` へのpushで `.github/workflows/web.yml` がインポート・テスト・Webビルド・ブラウザ検証を実行し、成功したビルドをPagesにデプロイします。pull requestでは公開せず検証のみ実行します。
+`main` へのpushで `.github/workflows/web.yml` がインポート・テスト・Webビルド・ブラウザ検証を実行し、成功したビルドをPagesにデプロイします。公開後は実際のHTTPS URLでChrome・Safariエンジンの経営・保存テストを再実行し、結果を `kikori-live-reports` に保存します。pull requestでは公開せず検証のみ実行します。
 
 初回、GitHub側でPagesが無効の場合は、リポジトリの **Settings → Pages → Build and deployment → Source: GitHub Actions** を設定してください。ワークフローには自動有効化も設定していますが、組織やトークンの権限によって管理者による初回設定が必要な場合があります。その後はActionsの「Run workflow」、または次のpushで再デプロイできます。
 

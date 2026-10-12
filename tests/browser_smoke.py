@@ -48,8 +48,7 @@ def inspect_browser(browser, url, name):
     tap("start")
     page.wait_for_function("window.kikoriState && window.kikoriState.saved", timeout=15000)
     print("KIKORI_INITIAL_STATE", page.evaluate("window.kikoriState"), flush=True)
-    # WebKitGTK's screenshot readback triggers framebuffer validation errors on Mesa.
-    # Keep strict console checks, and exercise WebKit without the capture API.
+    # Capture the mobile portrait view in Chromium; both engines run the same assertions.
     if name == "chromium":
         preview = page.screenshot(path=f"reports/{name}-portrait.png")
         emit_preview(name, preview)
@@ -113,14 +112,15 @@ def main():
         with sync_playwright() as playwright:
             engines = ["chromium", "webkit"] if args.engine == "all" else [args.engine]
             for engine in engines:
-                # GTK WebKit's headless screenshot path has a Mesa framebuffer issue.
-                # CI runs the normal WebKit window under Xvfb instead.
+                # WebKitGTK uses a normal window under Xvfb for its WebGL surface.
                 options = {"headless": engine != "webkit"}
                 if engine == "chromium":
                     options["args"] = ["--enable-webgl", "--use-gl=angle", "--use-angle=swiftshader", "--enable-unsafe-swiftshader"]
                 browser = getattr(playwright, engine).launch(**options)
                 try:
-                    results.append(inspect_browser(browser, url, engine))
+                    result = inspect_browser(browser, url, engine)
+                    results.append(result)
+                    Path(f"reports/{engine}-results.json").write_text(json.dumps(result, ensure_ascii=False, indent=2))
                 finally:
                     browser.close()
         Path("reports/browser-results.json").write_text(json.dumps(results, ensure_ascii=False, indent=2))
