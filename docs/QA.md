@@ -2,7 +2,7 @@
 
 ## Confirmed locally
 
-- Godot 4.6.3 Compatibility project imports and the complete game scene starts headlessly.
+- Godot 4.5.2 Compatibility project imports and the complete game scene starts headlessly.
 - Deterministic economy suite: **815 assertions, 0 failures**.
 - Simulation covers production, regeneration, purchases, maximum levels, cooldown, conserved log counts, bounded stock, save validation/round-trip, capped offline progress and one hour of maximum upgrades.
 - Python tooling compiles. Original assets and font provenance documented.

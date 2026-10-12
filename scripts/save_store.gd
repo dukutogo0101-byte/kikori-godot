@@ -5,6 +5,10 @@ const FILE = "user://kikori_save.json"
 const MAX_BYTES = 100000
 var available = true
 var message = ""
+var file_path = FILE
+
+func _init(native_path: String = FILE) -> void:
+	file_path = native_path
 
 func read_save() -> Dictionary:
 	var raw = ""
@@ -16,8 +20,8 @@ func read_save() -> Dictionary:
 			available = false
 			message = "保存が制限されています。このタブでは遊べます。"
 			return {}
-	elif FileAccess.file_exists(FILE):
-		raw = FileAccess.get_file_as_string(FILE)
+	elif FileAccess.file_exists(file_path):
+		raw = FileAccess.get_file_as_string(file_path)
 	if raw.is_empty():
 		return {}
 	if raw.length() > MAX_BYTES:
@@ -38,11 +42,11 @@ func write_save(state: Dictionary) -> bool:
 		var script = "(function(){try{localStorage.setItem('%s', %s);return 1;}catch(e){return 0;}})()" % [KEY, JSON.stringify(raw)]
 		available = int(JavaScriptBridge.eval(script, true)) == 1
 	else:
-		var file = FileAccess.open(FILE + ".tmp", FileAccess.WRITE)
+		var file = FileAccess.open(file_path + ".tmp", FileAccess.WRITE)
 		available = file != null
 		if file:
 			file.store_string(raw)
 			file.close()
-			available = DirAccess.rename_absolute(FILE + ".tmp", FILE) == OK
+			available = DirAccess.rename_absolute(file_path + ".tmp", file_path) == OK
 	message = "" if available else "保存できません。ブラウザの保存設定を確認してください。"
 	return available

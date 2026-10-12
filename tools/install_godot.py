@@ -12,11 +12,11 @@ import shutil
 import urllib.request
 import zipfile
 
-VERSION = "4.6.3"
+VERSION = "4.5.2"
 RELEASE = f"https://github.com/godotengine/godot-builds/releases/download/{VERSION}-stable"
 ARCHIVES = {
-    f"Godot_v{VERSION}-stable_linux.x86_64.zip": "d0bc2113065e481c9c2c2b2c37daa4e8be3fe9e27f0ab9ab0b6096e9a37907f3",
-    f"Godot_v{VERSION}-stable_export_templates.tpz": "3fbe2c0e2dec9d537ab9ec97bcf8da91dcf23357fc51f67092dd068d839290a8",
+    f"Godot_v{VERSION}-stable_linux.x86_64.zip": "87f6e6be292929e363d15ed9052f277b2ba4e95ed994e1e099048097be2dfd03",
+    f"Godot_v{VERSION}-stable_export_templates.tpz": "ea50e5183f057d42b22120d0d0340205b98f51f8ff13c33c70fd4ac9077d2019",
 }
 
 
