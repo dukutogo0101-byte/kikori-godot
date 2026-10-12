@@ -84,8 +84,11 @@ def inspect_browser(browser, url, name):
     page.evaluate("localStorage.setItem('kikori.phase1.v1', '{invalid json')")
     page.reload(wait_until="domcontentloaded")
     page.wait_for_function("window.kikoriReady === true", timeout=90000)
+    gl_error = page.evaluate("document.getElementById('canvas').getContext('webgl2').getError()")
+    assert gl_error == 0, f"WebGL error flag: {gl_error}"
     assert not errors, "Browser errors: " + "\n".join(errors)
-    result = {"engine": name, "production": before, "persisted_level": saved["levels"]["wood"], "errors": errors}
+    result = {"engine": name, "production": before, "persisted_level": saved["levels"]["wood"], "errors": errors,
+              "webgl_error": gl_error, "renderer": page.evaluate("window.kikoriRenderer")}
     context.close()
     return result
 

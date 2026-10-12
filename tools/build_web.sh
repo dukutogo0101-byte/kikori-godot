@@ -3,6 +3,7 @@ set -euo pipefail
 cd "$(dirname "$0")/.."
 GODOT_BIN="${GODOT_BIN:-godot}"
 mkdir -p build/web reports
+node tests/test_web_guard.cjs
 "$GODOT_BIN" --headless --path . --editor --import --quit 2>&1 | tee reports/import.log
 python3 -c 'import re,sys; from pathlib import Path; sys.exit(bool(re.search("SCRIPT ERROR|Parse Error|Failed to load script", Path("reports/import.log").read_text())))'
 "$GODOT_BIN" --headless --path . --script tests/test_simulation.gd 2>&1 | tee reports/simulation.log
@@ -14,5 +15,6 @@ python3 -c 'import re,sys; from pathlib import Path; sys.exit(bool(re.search("SC
 test -s build/web/index.html
 test -s build/web/index.wasm
 test -s build/web/index.pck
+cp web/framebuffer_guard.js build/web/framebuffer_guard.js
 touch build/web/.nojekyll
 python3 -c 'from pathlib import Path; print("Web build bytes:", sum(p.stat().st_size for p in Path("build/web").iterdir() if p.is_file()))'

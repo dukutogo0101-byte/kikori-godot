@@ -39,8 +39,15 @@
     <button id="retry" hidden>もう一度読み込む</button>
   </section>
 </main>
+<script src="framebuffer_guard.js"></script>
 <script src="$GODOT_URL"></script>
 <script>
+  const canvas = document.getElementById('canvas');
+  const originalGetContext = canvas.getContext.bind(canvas);
+  canvas.getContext = function(type, ...args) {
+    const context = originalGetContext(type, ...args);
+    return type === 'webgl2' ? KikoriProtectWebGL(context) : context;
+  };
   const GODOT_CONFIG = $GODOT_CONFIG;
   const engine = new Engine(GODOT_CONFIG);
   const loading = document.getElementById('loading');
