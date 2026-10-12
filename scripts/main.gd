@@ -189,7 +189,7 @@ func _process(delta: float) -> void:
 	ui_clock += dt
 	save_clock += dt
 	toast_clock = maxf(0, toast_clock - dt)
-	toast_label.visible = toast_clock > 0
+	toast_label.visible = toast_clock > 0 and not toast_label.text.is_empty()
 	if ui_clock >= 0.2:
 		ui_clock = 0
 		_update_hud()
@@ -550,6 +550,8 @@ func _upgrade(kind: String) -> void:
 		_save_browser_debug()
 
 func _toast(text: String, seconds: float = 3.0) -> void:
+	if text.is_empty():
+		return
 	toast_label.text = text
 	toast_clock = seconds
 	toast_label.visible = true
@@ -566,7 +568,7 @@ func _save() -> void:
 func _save_browser_debug() -> void:
 	if OS.has_feature("web"):
 		# Read-only diagnostics for automated real-browser smoke tests. No game mutation.
-		var summary = {"money": sim.money, "processed": sim.processed, "felled": sim.felled, "levels": sim.levels, "elapsed": sim.elapsed, "fps": Engine.get_frames_per_second(), "calls": process_calls, "delta": last_delta, "paused": paused, "processing": is_processing(),
+		var summary = {"money": sim.money, "processed": sim.processed, "felled": sim.felled, "levels": sim.levels, "elapsed": sim.elapsed, "fps": Engine.get_frames_per_second(), "calls": process_calls, "delta": last_delta, "paused": paused, "processing": is_processing(), "notice": toast_label.text, "save_text": save_label.text,
 			"cargo": sim.cargo.size(), "ground": sim.ground_logs.size(), "mill": sim.mill_stock, "saved": store.available}
 		JavaScriptBridge.eval("window.kikoriState = %s;" % JSON.stringify(summary), true)
 		var size = get_viewport().get_visible_rect().size

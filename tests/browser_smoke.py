@@ -47,6 +47,7 @@ def inspect_browser(browser, url, name):
     page.wait_for_function("window.kikoriUi && window.kikoriUi.start && window.kikoriUi.start.y > 0", timeout=15000)
     tap("start")
     page.wait_for_function("window.kikoriState && window.kikoriState.saved", timeout=15000)
+    print("KIKORI_INITIAL_STATE", page.evaluate("window.kikoriState"), flush=True)
     preview = page.screenshot(path=f"reports/{name}-portrait.png")
     # Inline diagnostic lets repository-only clients review the rendered scene.
     emit_preview(name, preview)
