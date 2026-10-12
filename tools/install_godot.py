@@ -50,7 +50,7 @@ def main():
     templates = data / "godot/export_templates" / f"{VERSION}.stable"
     templates.mkdir(parents=True, exist_ok=True)
     with zipfile.ZipFile(destination / f"Godot_v{VERSION}-stable_export_templates.tpz") as archive:
-        for name in ["web_debug.zip", "web_release.zip"]:
+        for name in ["web_nothreads_debug.zip", "web_nothreads_release.zip"]:
             with archive.open(f"templates/{name}") as source, (templates / name).open("wb") as output:
                 shutil.copyfileobj(source, output)
     print(f"Godot installed: {destination / 'godot'}")

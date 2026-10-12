@@ -48,6 +48,7 @@ jobs:
           name: kikori-test-reports
           path: reports/
       - name: Upload playable Web build
+        if: always() && hashFiles('build/web/index.wasm') != ''
         uses: actions/upload-artifact@v4
         with:
           name: kikori-web
