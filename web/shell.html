@@ -1,0 +1,80 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+  <meta name="theme-color" content="#173f36">
+  <meta name="description" content="小さな森から、大きな未来へ。木を育て、木材を運び、製材所を強化する3D木こり経営ゲーム。">
+  <title>KIKORI — 小さな森の経営ゲーム</title>
+  <link rel="icon" href="index.icon.png">
+  <style>
+    :root { color-scheme: light; font-family: system-ui, sans-serif; background: #173f36; color: #f4f0db; }
+    * { box-sizing: border-box; }
+    html, body { margin: 0; width: 100%; height: 100%; overflow: hidden; overscroll-behavior: none; }
+    body { display: flex; justify-content: center; }
+    #frame { position: relative; width: 100%; max-width: 600px; height: 100%; padding: env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left); background: #b9dbd9; }
+    canvas { display: block; width: 100%; height: 100%; outline: none; touch-action: none; }
+    #loading { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; flex-direction: column; text-align: center; padding: 28px; background: #173f36; z-index: 2; }
+    #loading h1 { font-size: 52px; letter-spacing: 0.12em; margin: 12px 0; }
+    .eyebrow { color: #f0c77b; font-size: 11px; letter-spacing: .25em; }
+    #detail { max-width: 380px; line-height: 1.7; font-size: 14px; }
+    progress { width: min(280px, 80vw); height: 8px; border: 0; margin: 24px; accent-color: #f0c77b; border-radius: 6px; }
+    progress::-webkit-progress-bar { background: #285a4c; border-radius: 6px; }
+    progress::-webkit-progress-value { background: #f0c77b; border-radius: 6px; }
+    #retry { border: 0; border-radius: 12px; padding: 14px 28px; color: #173f36; background: #f0c77b; font-size: 16px; cursor: pointer; }
+    #loading[hidden], #retry[hidden] { display: none; }
+    @media (orientation: landscape) { #frame { max-width: 1100px; } }
+  </style>
+  $GODOT_HEAD_INCLUDE
+</head>
+<body>
+<main id="frame">
+  <canvas id="canvas" tabindex="0" aria-label="KIKORI 3D木こり経営ゲーム。木こり・トラック・製材所を強化して森を経営します。"></canvas>
+  <section id="loading" role="status" aria-live="polite">
+    <svg width="72" height="72" viewBox="0 0 128 128" aria-hidden="true"><path d="M64 8 30 58h18L20 92h88L80 58h18Z" fill="#bcea8b"/><path d="M59 88h10v31H59z" fill="#f0c77b"/></svg>
+    <div class="eyebrow">A LITTLE FOREST COMPANY</div>
+    <h1>KIKORI</h1>
+    <div id="detail">森を準備しています…<br>初回は少し時間がかかります。</div>
+    <progress id="progress" max="100" value="0" aria-label="読み込み状況"></progress>
+    <button id="retry" hidden>もう一度読み込む</button>
+  </section>
+</main>
+<script src="$GODOT_URL"></script>
+<script>
+  const GODOT_CONFIG = $GODOT_CONFIG;
+  const engine = new Engine(GODOT_CONFIG);
+  const loading = document.getElementById('loading');
+  const detail = document.getElementById('detail');
+  const progress = document.getElementById('progress');
+  const retry = document.getElementById('retry');
+  retry.addEventListener('click', () => location.reload());
+  function fail(message) {
+    loading.hidden = false;
+    detail.textContent = message;
+    progress.hidden = true;
+    retry.hidden = false;
+    window.kikoriLoadError = message;
+  }
+  const missing = Engine.getMissingFeatures({ threads: false });
+  if (missing.length) {
+    fail('この端末ではWebGL 2を利用できません。最新のChromeまたはSafariで開いてください。');
+  } else {
+    const watchdog = setTimeout(() => fail('読み込みに時間がかかっています。通信状態を確認して再読み込みしてください。'), 90000);
+    engine.startGame({
+      canvas: document.getElementById('canvas'),
+      onProgress(current, total) { if (total > 0) progress.value = Math.round(current / total * 100); },
+      onExit(code) { if (code !== 0) fail('ゲームを続行できませんでした。保存済みの進行状況は再読み込みで復元されます。'); }
+    }).then(() => {
+      clearTimeout(watchdog);
+      loading.hidden = true;
+      document.getElementById('canvas').focus();
+    }).catch(error => {
+      clearTimeout(watchdog);
+      console.error(error);
+      fail('森を読み込めませんでした。通信状態を確認して再読み込みしてください。');
+    });
+  }
+  document.addEventListener('contextmenu', event => event.preventDefault());
+</script>
+</body>
+</html>

@@ -1,0 +1,79 @@
+name: Build, test and publish KIKORI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: kikori-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Cache verified Godot archives
+        uses: actions/cache@v4
+        with:
+          path: /tmp/kikori-godot-tools
+          key: godot-4.6.3-linux-web-sha256-v1
+      - name: Install official editor and single-thread Web templates
+        run: python3 tools/install_godot.py
+      - name: Import, simulation tests, scene smoke, release export
+        run: bash tools/build_web.sh
+      - name: Install browser engines
+        run: |
+          pip install playwright==1.56.0
+          python3 -m playwright install --with-deps chromium webkit
+      - name: Chromium WebGL end-to-end test
+        run: python3 tests/browser_smoke.py --engine chromium
+      - name: Safari engine WebGL end-to-end test
+        run: xvfb-run -a python3 tests/browser_smoke.py --engine webkit
+        env:
+          LIBGL_ALWAYS_SOFTWARE: '1'
+      - name: Keep logs, browser results and screenshots
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: kikori-test-reports
+          path: reports/
+      - name: Upload playable Web build
+        uses: actions/upload-artifact@v4
+        with:
+          name: kikori-web
+          path: build/web/
+      - name: Upload Pages site
+        if: github.ref == 'refs/heads/main' && github.event_name != 'pull_request'
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: build/web/
+
+  deploy:
+    if: github.ref == 'refs/heads/main' && github.event_name != 'pull_request'
+    needs: build
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    permissions:
+      pages: write
+      id-token: write
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - name: Configure GitHub Pages
+        uses: actions/configure-pages@v5
+        with:
+          enablement: true
+      - name: Deploy game
+        id: deployment
+        uses: actions/deploy-pages@v4
