@@ -458,6 +458,13 @@ func _build_ui() -> void:
 func _resize() -> void:
 	if hud == null:
 		return
+	# Keep touch targets at CSS-sized dimensions in either orientation, including Retina.
+	var pixels = get_window().size
+	var reference = Vector2i(844, 390) if pixels.x > pixels.y * 1.15 else Vector2i(390, 844)
+	if get_window().content_scale_size != reference:
+		get_window().content_scale_size = reference
+		call_deferred("_resize")
+		return
 	var size = get_viewport().get_visible_rect().size
 	var w = size.x
 	var h = size.y
@@ -509,7 +516,7 @@ func _update_hud() -> void:
 	status_label.text = "伐採待ち %d本   ·   丸太 %d本   ·   加工待ち %d本" % [_ready_trees(), sim.ground_logs.size(), sim.mill_stock]
 	var goal = 10 if sim.processed < 10 else (50 if sim.processed < 50 else (150 if sim.processed < 150 else 500))
 	mission_label.text = "次の目標：木材を %d本 出荷  %d / %d" % [goal, sim.processed, goal] if sim.processed < 500 else "森のマスター！ 累計 %d本 出荷" % sim.processed
-	var descriptions = {"wood": "木こり  %d人 · 伐採力 UP" % sim.workers.size(), "truck": "トラック  %d本積み · 積載と速度 UP" % sim.capacity(), "mill": "製材所  %.1f秒/本 · 加工速度 UP" % sim.process_seconds()}
+	var descriptions = {"wood": "木こり  %d人 · 伐採力 UP" % sim.workers.size(), "truck": "トラック  %d本積み · 運搬力 UP" % sim.capacity(), "mill": "製材所  %.1f秒/本 · 加工速度 UP" % sim.process_seconds()}
 	for kind in buttons:
 		var price = sim.cost(kind)
 		buttons[kind].text = "%s\nLv.%d     %s" % [descriptions[kind], sim.levels[kind] + 1, ("強化  " + _amount(price)) if price > 0 else "最大レベル"]
@@ -564,7 +571,7 @@ func _save() -> void:
 func _save_browser_debug() -> void:
 	if OS.has_feature("web"):
 		# Read-only diagnostics for automated real-browser smoke tests. No game mutation.
-		var summary = {"money": sim.money, "processed": sim.processed, "felled": sim.felled, "levels": sim.levels,
+		var summary = {"money": sim.money, "processed": sim.processed, "felled": sim.felled, "levels": sim.levels, "elapsed": sim.elapsed, "fps": Engine.get_frames_per_second(),
 			"cargo": sim.cargo.size(), "ground": sim.ground_logs.size(), "mill": sim.mill_stock, "saved": store.available}
 		JavaScriptBridge.eval("window.kikoriState = %s;" % JSON.stringify(summary), true)
 		var size = get_viewport().get_visible_rect().size

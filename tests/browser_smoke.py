@@ -6,6 +6,7 @@ Chromium is an Android-sized approximation; WebKit checks the Safari engine.
 Real device certification is a separate manual check.
 """
 import argparse
+import base64
 import json
 from pathlib import Path
 import threading
@@ -19,8 +20,8 @@ def inspect_browser(browser, url, name):
                                   is_mobile=True, has_touch=True, locale="ja-JP")
     page = context.new_page()
     errors = []
-    page.on("pageerror", lambda error: errors.append(str(error)))
-    page.on("console", lambda message: errors.append(message.text) if message.type == "error" else None)
+    page.on("pageerror", lambda error: (errors.append(str(error)), print("PAGE_ERROR:", error, flush=True)))
+    page.on("console", lambda message: (errors.append(message.text), print("CONSOLE_ERROR:", message.text, flush=True)) if message.type == "error" else None)
     page.goto(url, wait_until="domcontentloaded")
     page.wait_for_function("window.kikoriReady === true", timeout=90000)
     page.wait_for_timeout(1000)
@@ -34,10 +35,18 @@ def inspect_browser(browser, url, name):
     page.wait_for_function("window.kikoriUi && window.kikoriUi.start && window.kikoriUi.start.y > 0", timeout=15000)
     tap("start")
     page.wait_for_function("window.kikoriState && window.kikoriState.saved", timeout=15000)
-    page.screenshot(path=f"reports/{name}-portrait.png")
+    preview = page.screenshot(path=f"reports/{name}-portrait.png")
+    # Inline diagnostic lets repository-only clients review the rendered scene.
+    print("KIKORI_PREVIEW " + name + " " + base64.b64encode(preview).decode(), flush=True)
     # Rush and wait for the full physical production loop; diagnostics are read-only.
     tap("boost")
-    page.wait_for_function("window.kikoriState && window.kikoriState.processed >= 3 && window.kikoriState.money >= 50", timeout=75000)
+    try:
+        page.wait_for_function("window.kikoriState && window.kikoriState.processed >= 3 && window.kikoriState.money >= 50", timeout=75000, polling=500)
+    except Exception:
+        print("KIKORI_TIMEOUT_STATE", page.evaluate("({state:window.kikoriState,ui:window.kikoriUi,hidden:document.hidden})"), flush=True)
+        preview = page.screenshot(path=f"reports/{name}-failure.png")
+        print("KIKORI_PREVIEW failure " + base64.b64encode(preview).decode(), flush=True)
+        raise
     before = page.evaluate("window.kikoriState")
     tap("wood")
     page.wait_for_function("window.kikoriState.levels.wood === 1", timeout=15000)
