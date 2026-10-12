@@ -190,6 +190,7 @@ func _process(delta: float) -> void:
 	save_clock += dt
 	toast_clock = maxf(0, toast_clock - dt)
 	toast_label.visible = toast_clock > 0 and not toast_label.text.is_empty()
+	toast_label.modulate.a = clampf(toast_clock, 0.0, 1.0)
 	if ui_clock >= 0.2:
 		ui_clock = 0
 		_update_hud()
@@ -524,8 +525,7 @@ func _update_hud() -> void:
 	else:
 		boost_button.text = "応援する · 15秒間 作業速度 ×2"
 	boost_button.disabled = sim.boost_cooldown > 0
-	if not store.available:
-		save_label.text = "保存不可 · このタブ内で進行"
+	save_label.text = "自動保存 · このブラウザ" if store.available else "保存不可 · このタブ内で進行"
 
 func _ready_trees() -> int:
 	var count = 0
@@ -555,6 +555,7 @@ func _toast(text: String, seconds: float = 3.0) -> void:
 	toast_label.text = text
 	toast_clock = seconds
 	toast_label.visible = true
+	toast_label.modulate.a = 1.0
 
 func _save() -> void:
 	save_clock = 0

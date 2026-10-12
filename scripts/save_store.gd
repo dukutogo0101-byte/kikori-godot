@@ -35,8 +35,8 @@ func write_save(state: Dictionary) -> bool:
 	var raw = JSON.stringify(payload, "", true, true)
 	if OS.has_feature("web"):
 		# JSON.stringify of a string is a safe JS literal, including user-controlled text.
-		var script = "(function(){try{localStorage.setItem('%s', %s);return true;}catch(e){return false;}})()" % [KEY, JSON.stringify(raw)]
-		available = JavaScriptBridge.eval(script, true) == true
+		var script = "(function(){try{localStorage.setItem('%s', %s);return 1;}catch(e){return 0;}})()" % [KEY, JSON.stringify(raw)]
+		available = int(JavaScriptBridge.eval(script, true)) == 1
 	else:
 		var file = FileAccess.open(FILE + ".tmp", FileAccess.WRITE)
 		available = file != null

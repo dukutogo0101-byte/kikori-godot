@@ -48,17 +48,20 @@ def inspect_browser(browser, url, name):
     tap("start")
     page.wait_for_function("window.kikoriState && window.kikoriState.saved", timeout=15000)
     print("KIKORI_INITIAL_STATE", page.evaluate("window.kikoriState"), flush=True)
-    preview = page.screenshot(path=f"reports/{name}-portrait.png")
-    # Inline diagnostic lets repository-only clients review the rendered scene.
-    emit_preview(name, preview)
+    # WebKitGTK's screenshot readback triggers framebuffer validation errors on Mesa.
+    # Keep strict console checks, and exercise WebKit without the capture API.
+    if name == "chromium":
+        preview = page.screenshot(path=f"reports/{name}-portrait.png")
+        emit_preview(name, preview)
     # Rush and wait for the full physical production loop; diagnostics are read-only.
     tap("boost")
     try:
         page.wait_for_function("window.kikoriState && window.kikoriState.processed >= 3 && window.kikoriState.money >= 50", timeout=75000, polling=500)
     except Exception:
         print("KIKORI_TIMEOUT_STATE", page.evaluate("({state:window.kikoriState,ui:window.kikoriUi,hidden:document.hidden})"), flush=True)
-        preview = page.screenshot(path=f"reports/{name}-failure.png")
-        emit_preview("failure", preview)
+        if name == "chromium":
+            preview = page.screenshot(path=f"reports/{name}-failure.png")
+            emit_preview("failure", preview)
         raise
     before = page.evaluate("window.kikoriState")
     tap("wood")
@@ -70,11 +73,13 @@ def inspect_browser(browser, url, name):
     page.wait_for_function("window.kikoriReady === true", timeout=90000)
     page.wait_for_function("window.kikoriState && window.kikoriState.levels.wood === 1", timeout=15000)
     assert page.evaluate("window.kikoriState.processed") >= saved["processed"], "Reload lost progress"
-    page.screenshot(path=f"reports/{name}-upgraded.png")
+    if name == "chromium":
+        page.screenshot(path=f"reports/{name}-upgraded.png")
     # Wide layout: controls remain visible next to the island.
     page.set_viewport_size({"width": 844, "height": 390})
     page.wait_for_timeout(1500)
-    page.screenshot(path=f"reports/{name}-landscape.png")
+    if name == "chromium":
+        page.screenshot(path=f"reports/{name}-landscape.png")
     # Corrupted state must fall back to a playable fresh game.
     page.evaluate("localStorage.setItem('kikori.phase1.v1', '{invalid json')")
     page.reload(wait_until="domcontentloaded")
