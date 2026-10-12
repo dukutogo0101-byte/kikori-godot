@@ -12,7 +12,22 @@
     let draw = gl.getParameter(gl.DRAW_FRAMEBUFFER_BINDING);
     const originalBind = gl.bindFramebuffer.bind(gl);
     const originalBlit = gl.blitFramebuffer.bind(gl);
-    const stats = { skippedSelfBlits: 0, forwardedBlits: 0 };
+    const stats = { skippedSelfBlits: 0, forwardedBlits: 0, samples: [] };
+    const ids = new WeakMap();
+    let nextId = 1;
+    function id(value) {
+      if (value == null) return 0;
+      if (!ids.has(value)) ids.set(value, nextId++);
+      return ids.get(value);
+    }
+    function attachment(target, framebuffer) {
+      if (!framebuffer) return null;
+      const kind = gl.getFramebufferAttachmentParameter(target, gl.COLOR_ATTACHMENT0, gl.FRAMEBUFFER_ATTACHMENT_OBJECT_TYPE);
+      if (kind === gl.NONE) return null;
+      const object = gl.getFramebufferAttachmentParameter(target, gl.COLOR_ATTACHMENT0, gl.FRAMEBUFFER_ATTACHMENT_OBJECT_NAME);
+      return { object: id(object), kind,
+        level: kind === gl.TEXTURE ? gl.getFramebufferAttachmentParameter(target, gl.COLOR_ATTACHMENT0, gl.FRAMEBUFFER_ATTACHMENT_TEXTURE_LEVEL) : null };
+    }
     gl.bindFramebuffer = function (target, framebuffer) {
       originalBind(target, framebuffer);
       if (target === gl.FRAMEBUFFER || target === gl.READ_FRAMEBUFFER) read = framebuffer;
@@ -24,6 +39,10 @@
         return;
       }
       stats.forwardedBlits++;
+      if (stats.samples.length < 12 && typeof gl.getFramebufferAttachmentParameter === 'function') {
+        stats.samples.push({ read: id(read), draw: id(draw), source: attachment(gl.READ_FRAMEBUFFER, read),
+          destination: attachment(gl.DRAW_FRAMEBUFFER, draw), rectangles: [sx0, sy0, sx1, sy1, dx0, dy0, dx1, dy1], mask, filter });
+      }
       originalBlit(sx0, sy0, sx1, sy1, dx0, dy0, dx1, dy1, mask, filter);
     };
     gl.kikoriFramebufferGuard = stats;

@@ -66,7 +66,8 @@ def inspect_browser(browser, url, name):
     before = page.evaluate("window.kikoriState")
     tap("wood")
     page.wait_for_function("window.kikoriState.levels.wood === 1", timeout=15000)
-    assert page.evaluate("window.kikoriState.money") <= before["money"] + 12 - 50, "Upgrade did not charge funds"
+    after = page.evaluate("window.kikoriState")
+    assert after["money"] == before["money"] + (after["processed"] - before["processed"]) * 12 - 50, "Upgrade payment must account for concurrent sales"
     saved = page.evaluate("JSON.parse(localStorage.getItem('kikori.phase1.v1'))")
     assert saved["levels"]["wood"] == 1
     page.reload(wait_until="domcontentloaded")
@@ -85,6 +86,7 @@ def inspect_browser(browser, url, name):
     page.reload(wait_until="domcontentloaded")
     page.wait_for_function("window.kikoriReady === true", timeout=90000)
     gl_error = page.evaluate("document.getElementById('canvas').getContext('webgl2').getError()")
+    print("KIKORI_RENDER_STATE", name, page.evaluate("window.kikoriRenderer"), flush=True)
     assert gl_error == 0, f"WebGL error flag: {gl_error}"
     assert not errors, "Browser errors: " + "\n".join(errors)
     result = {"engine": name, "production": before, "persisted_level": saved["levels"]["wood"], "errors": errors,
