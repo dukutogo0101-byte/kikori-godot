@@ -66,7 +66,16 @@ def state(page):
 
 
 def ready(page):
-    page.wait_for_function('window.kikoriReady && window.kikoriState', timeout=90000)
+    try:
+        page.wait_for_function('window.kikoriReady && window.kikoriState', timeout=90000)
+    except Exception:
+        info=page.evaluate("""() => ({url:location.href,hidden:document.hidden,
+          loading:document.querySelector('#detail')?.textContent,
+          error:window.kikoriLoadError,ready:window.kikoriReady,
+          renderer:window.kikoriRenderer,canvas:[document.querySelector('#canvas')?.width,document.querySelector('#canvas')?.height]})""")
+        print('KIKORI_BOOT_FAILURE',json.dumps(info,ensure_ascii=False),flush=True)
+        page.screenshot(path='reports/boot-failure.png')
+        raise
     page.wait_for_timeout(250)
 
 
@@ -382,7 +391,10 @@ def inspect(browser, url, engine, full):
 
 def probe(browser, url, engine):
     context=browser.new_context(viewport={'width':390,'height':844},has_touch=True,is_mobile=True)
-    page=context.new_page();page.bring_to_front();page.goto(url);ready(page)
+    page=context.new_page()
+    page.on('pageerror',lambda e:print('KIKORI_BOOT_PAGE_ERROR',str(e),flush=True))
+    page.on('console',lambda e:print('KIKORI_BOOT_CONSOLE',e.type,e.text,flush=True))
+    page.bring_to_front();page.goto(url);ready(page)
     before=state(page)
     first=capture(page,engine+'-probe-before')
     page.keyboard.down('w');page.wait_for_timeout(900);page.keyboard.up('w');page.wait_for_timeout(300)
