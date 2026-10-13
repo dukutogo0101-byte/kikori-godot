@@ -60,11 +60,17 @@
     function presentTexture(width, height) {
       if (typeof gl.createShader !== 'function') return false;
       if (gl.getParameter(gl.READ_BUFFER) !== gl.COLOR_ATTACHMENT0) return false;
-      const kind = gl.getFramebufferAttachmentParameter(gl.READ_FRAMEBUFFER, gl.COLOR_ATTACHMENT0, gl.FRAMEBUFFER_ATTACHMENT_OBJECT_TYPE);
+      function attachment(parameter) {
+        const previous = gl.getParameter(gl.DRAW_FRAMEBUFFER_BINDING);
+        originalBind(gl.DRAW_FRAMEBUFFER, gl.getParameter(gl.READ_FRAMEBUFFER_BINDING));
+        try { return gl.getFramebufferAttachmentParameter(gl.READ_FRAMEBUFFER, gl.COLOR_ATTACHMENT0, parameter); }
+        finally { originalBind(gl.DRAW_FRAMEBUFFER, previous); }
+      }
+      const kind = attachment(gl.FRAMEBUFFER_ATTACHMENT_OBJECT_TYPE);
       if (kind !== gl.TEXTURE) return false;
-      const level = gl.getFramebufferAttachmentParameter(gl.READ_FRAMEBUFFER, gl.COLOR_ATTACHMENT0, gl.FRAMEBUFFER_ATTACHMENT_TEXTURE_LEVEL);
+      const level = attachment(gl.FRAMEBUFFER_ATTACHMENT_TEXTURE_LEVEL);
       if (level !== 0) return false;
-      const texture = gl.getFramebufferAttachmentParameter(gl.READ_FRAMEBUFFER, gl.COLOR_ATTACHMENT0, gl.FRAMEBUFFER_ATTACHMENT_OBJECT_NAME);
+      const texture = attachment(gl.FRAMEBUFFER_ATTACHMENT_OBJECT_NAME);
       if (textureTargets.get(texture) !== gl.TEXTURE_2D) return false;
       let renderer;
       try { renderer = resources(); } catch (error) { console.error('KIKORI presentation shader:', error); return false; }
@@ -102,7 +108,10 @@
           renderer.width = width;
           renderer.height = height;
         }
+        const previousDraw = gl.getParameter(gl.DRAW_FRAMEBUFFER_BINDING);
+        originalBind(gl.DRAW_FRAMEBUFFER, gl.getParameter(gl.READ_FRAMEBUFFER_BINDING));
         gl.copyTexSubImage2D(gl.TEXTURE_2D, 0, 0, 0, 0, 0, width, height);
+        originalBind(gl.DRAW_FRAMEBUFFER, previousDraw);
         gl.bindSampler(0, renderer.sampler);
         gl.uniform1i(renderer.uniform, 0);
         gl.drawArrays(gl.TRIANGLES, 0, 3);
