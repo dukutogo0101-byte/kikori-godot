@@ -54,7 +54,7 @@
       gl.samplerParameteri(sampler, gl.TEXTURE_MAG_FILTER, gl.NEAREST);
       gl.samplerParameteri(sampler, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
       gl.samplerParameteri(sampler, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
-      copy = { program, sampler, vao: gl.createVertexArray(), uniform: gl.getUniformLocation(program, 'u_source') };
+      copy = { program, sampler, texture: gl.createTexture(), width: 0, height: 0, vao: gl.createVertexArray(), uniform: gl.getUniformLocation(program, 'u_source') };
       return copy;
     }
     function presentTexture(width, height) {
@@ -84,7 +84,15 @@
         gl.viewport(0, 0, width, height);
         gl.useProgram(renderer.program);
         gl.bindVertexArray(renderer.vao);
-        gl.bindTexture(gl.TEXTURE_2D, texture);
+        // A distinct copy prevents feedback if WebKit aliases its default
+        // drawing image with Godot's read attachment during presentation.
+        gl.bindTexture(gl.TEXTURE_2D, renderer.texture);
+        if (renderer.width !== width || renderer.height !== height) {
+          gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA8, width, height, 0, gl.RGBA, gl.UNSIGNED_BYTE, null);
+          renderer.width = width;
+          renderer.height = height;
+        }
+        gl.copyTexSubImage2D(gl.TEXTURE_2D, 0, 0, 0, 0, 0, width, height);
         gl.bindSampler(0, renderer.sampler);
         gl.uniform1i(renderer.uniform, 0);
         gl.drawArrays(gl.TRIANGLES, 0, 3);
