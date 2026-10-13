@@ -7,6 +7,7 @@ emulation/software rendering is not physical Android/iPhone certification.
 import argparse
 import base64
 import json
+import hashlib
 import math
 import os
 import threading
@@ -23,17 +24,22 @@ def capture(page, name):
     if page.context.browser.browser_type.name == 'webkit':
         # GTK's compositor snapshot may retain an old WebGL layer. Capture the
         # actual canvas in its animation frame instead, without changing buffers.
-        encoded = page.evaluate("""() => new Promise(resolve =>
-            requestAnimationFrame(() => requestAnimationFrame(() =>
-                resolve(document.querySelector('#canvas').toDataURL('image/png').split(',')[1]))))""")
+        encoded = page.evaluate("""() => new Promise(resolve => {
+            let done=false;
+            function finish(){if(done)return;done=true;resolve(document.querySelector('#canvas').toDataURL('image/png').split(',')[1]);}
+            setTimeout(finish,2500);
+            requestAnimationFrame(() => requestAnimationFrame(finish));
+        })""")
         data = base64.b64decode(encoded)
         Path(f'reports/{name}.png').write_bytes(data)
     else:
         data = page.screenshot(path=f'reports/{name}.png')
+    assert len(data)>3000, "Rendered canvas must not be an empty buffer"
     os.set_blocking(1, True)
     code = base64.b64encode(data).decode()
     for i in range(0, len(code), 2048):
         print(f'KIKORI_PREVIEW_DATA {name} ' + code[i:i + 2048], flush=True)
+    return hashlib.sha256(data).hexdigest()
 
 
 def state(page):
@@ -191,8 +197,9 @@ def touch_checks(page, context):
 def inspect(browser, url, engine, full):
     context = browser.new_context(viewport={'width': 390, 'height': 844}, is_mobile=True,
                                   has_touch=True, locale='ja-JP')
-    context.add_init_script("localStorage.setItem('kikori.phase1.v1', JSON.stringify({money:1000000000}));")
+    context.add_init_script("try{localStorage.setItem('kikori.phase1.v1', JSON.stringify({money:1000000000}));}catch(e){}")
     page = context.new_page()
+    page.bring_to_front()
     errors = []
     page.on('pageerror', lambda e: errors.append(str(e)))
     page.on('console', lambda e: errors.append(e.text) if e.type == 'error' else None)
@@ -202,7 +209,7 @@ def inspect(browser, url, engine, full):
         ready(page)
         load_seconds = time.monotonic() - started
         assert state(page)['money'] == 0, 'Old idle-game wealth must not skip the new beginning'
-        capture(page, engine + '-start')
+        first_frame = capture(page, engine + '-start')
         if engine == 'chromium':
             touch_checks(page, context)
         # Tapping UI and opening a modal must never create movement.
@@ -224,13 +231,29 @@ def inspect(browser, url, engine, full):
             page.wait_for_timeout(220)
             assert math.dist(stopped, state(page)['position']) < .03, event + ' must reset input'
             page.keyboard.up('w')
-        page.evaluate("Object.defineProperty(document,'hidden',{configurable:true,value:true});document.dispatchEvent(new Event('visibilitychange'))")
-        page.wait_for_timeout(200)
-        paused = state(page)
-        page.wait_for_timeout(400)
-        assert state(page)['paused'] and abs(state(page)['elapsed'] - paused['elapsed']) < .03
-        page.evaluate("delete document.hidden;document.dispatchEvent(new Event('visibilitychange'))")
-        page.wait_for_timeout(200)
+        # Real tab activation keeps browser/Godot rendering lifecycle coherent.
+        # Overriding document.hidden can freeze WebKit's drawing while scripts run.
+        page.keyboard.down('w')
+        page.wait_for_timeout(150)
+        background = context.new_page()
+        background.goto('data:text/html,<title>Background check</title>')
+        background.bring_to_front()
+        page.wait_for_timeout(220)
+        hidden = page.evaluate('document.hidden')
+        if hidden:
+            paused_elapsed = state(page)['elapsed']
+            page.wait_for_timeout(400)
+            assert abs(state(page)['elapsed'] - paused_elapsed) < .03
+        else:
+            # Headless Chromium may keep all targets visible; blur covers input reset.
+            page.evaluate("window.dispatchEvent(new Event('blur'))")
+        page.bring_to_front()
+        background.close()
+        page.wait_for_timeout(300)
+        page.keyboard.up('w')
+        stopped = state(page)['position']
+        page.wait_for_timeout(250)
+        assert math.dist(stopped, state(page)['position']) < .03
         # Keep input held while inspecting collision so automatic chopping cannot
         # remove the tested trunk during a slow browser snapshot.
         path(page, -6.3, 5.2)
@@ -245,7 +268,8 @@ def inspect(browser, url, engine, full):
             page.keyboard.up('w')
         page.wait_for_timeout(140)
         fill(page, 0)
-        capture(page, engine + '-carry')
+        carry_frame = capture(page, engine + '-carry')
+        assert carry_frame != first_frame, 'Rendering must update as the protagonist moves and carries logs'
         sell(page)
         sale_seconds = time.monotonic() - started
         capture(page, engine + '-sale')
@@ -316,7 +340,7 @@ def inspect(browser, url, engine, full):
                   'first_sale_wall_seconds': round(sale_seconds, 2), 'timings': final['timings'],
                   'money': final['money'], 'levels': final['levels'], 'projects': final['projects'],
                   'objects': final['objects'], 'conserved': final['conserved'], 'errors': errors,
-                  'software_fps': final['fps']}
+                  'software_fps': final['fps'], 'actual_background_visibility': hidden, 'rendered_frame_changed': carry_frame != first_frame}
         # Separate context verifies blocked storage without damaging successful saves.
         restricted = browser.new_context(viewport={'width': 390, 'height': 844})
         restricted.add_init_script("Storage.prototype.getItem=function(){throw new Error('denied')};Storage.prototype.setItem=function(){throw new Error('denied')};")
