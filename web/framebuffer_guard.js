@@ -54,7 +54,7 @@
       gl.samplerParameteri(sampler, gl.TEXTURE_MAG_FILTER, gl.NEAREST);
       gl.samplerParameteri(sampler, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
       gl.samplerParameteri(sampler, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
-      copy = { program, sampler, texture: gl.createTexture(), width: 0, height: 0, vao: gl.createVertexArray(), uniform: gl.getUniformLocation(program, 'u_source') };
+      copy = { program, sampler, texture: gl.createTexture(), framebuffer: gl.createFramebuffer(), width: 0, height: 0, vao: gl.createVertexArray(), uniform: gl.getUniformLocation(program, 'u_source') };
       return copy;
     }
     function presentTexture(width, height) {
@@ -108,13 +108,14 @@
           renderer.width = width;
           renderer.height = height;
         }
-        const previousDraw = gl.getParameter(gl.DRAW_FRAMEBUFFER_BINDING);
-        originalBind(gl.DRAW_FRAMEBUFFER, gl.getParameter(gl.READ_FRAMEBUFFER_BINDING));
-        gl.copyTexSubImage2D(gl.TEXTURE_2D, 0, 0, 0, 0, 0, width, height);
-        originalBind(gl.DRAW_FRAMEBUFFER, previousDraw);
-        gl.bindSampler(0, renderer.sampler);
-        gl.uniform1i(renderer.uniform, 0);
-        gl.drawArrays(gl.TRIANGLES, 0, 3);
+        const sourceFramebuffer = gl.getParameter(gl.READ_FRAMEBUFFER_BINDING);
+        originalBind(gl.DRAW_FRAMEBUFFER, renderer.framebuffer);
+        gl.framebufferTexture2D(gl.DRAW_FRAMEBUFFER, gl.COLOR_ATTACHMENT0, gl.TEXTURE_2D, renderer.texture, 0);
+        originalBlit(0, 0, width, height, 0, 0, width, height, gl.COLOR_BUFFER_BIT, gl.NEAREST);
+        originalBind(gl.READ_FRAMEBUFFER, renderer.framebuffer);
+        originalBind(gl.DRAW_FRAMEBUFFER, null);
+        originalBlit(0, 0, width, height, 0, 0, width, height, gl.COLOR_BUFFER_BIT, gl.NEAREST);
+        originalBind(gl.READ_FRAMEBUFFER, sourceFramebuffer);
         if(inspect){
           const sourceFramebuffer=gl.getParameter(gl.READ_FRAMEBUFFER_BINDING);
           originalBind(gl.READ_FRAMEBUFFER,null);
