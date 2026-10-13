@@ -78,6 +78,16 @@
       gl.activeTexture(gl.TEXTURE0);
       const previousTexture = gl.getParameter(gl.TEXTURE_BINDING_2D);
       const previousSampler = gl.getParameter(gl.SAMPLER_BINDING);
+      const inspect = stats.shaderScreenCopies === 0 || stats.shaderScreenCopies === 30;
+      let sourceSignature;
+      function signature() {
+        const bytes = new Uint8Array(width * height * 4);
+        gl.readPixels(0, 0, width, height, gl.RGBA, gl.UNSIGNED_BYTE, bytes);
+        let hash = 2166136261;
+        for(let i=0;i<bytes.length;i+=64) hash=Math.imul(hash^bytes[i],16777619);
+        return hash >>> 0;
+      }
+      if(inspect) sourceSignature=signature();
       try {
         flags.forEach(flag => gl.disable(flag));
         gl.colorMask(true, true, true, true);
@@ -96,6 +106,16 @@
         gl.bindSampler(0, renderer.sampler);
         gl.uniform1i(renderer.uniform, 0);
         gl.drawArrays(gl.TRIANGLES, 0, 3);
+        if(inspect){
+          const sourceFramebuffer=gl.getParameter(gl.READ_FRAMEBUFFER_BINDING);
+          originalBind(gl.READ_FRAMEBUFFER,null);
+          const output=signature();
+          originalBind(gl.READ_FRAMEBUFFER,sourceFramebuffer);
+          stats.samples=stats.samples||[];
+          stats.samples.push({frame:stats.shaderScreenCopies,source:sourceSignature,output,
+            scissor:gl.isEnabled(gl.SCISSOR_TEST),box:Array.from(gl.getParameter(gl.SCISSOR_BOX)),
+            drawBuffer:gl.getParameter(gl.DRAW_BUFFER0)});
+        }
       } finally {
         gl.bindSampler(0, previousSampler);
         gl.bindTexture(gl.TEXTURE_2D, previousTexture);
