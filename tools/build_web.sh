@@ -6,8 +6,9 @@ mkdir -p build/web reports
 node tests/test_web_guard.cjs
 "$GODOT_BIN" --headless --path . --editor --import --quit 2>&1 | tee reports/import.log
 python3 -c 'import re,sys; from pathlib import Path; sys.exit(bool(re.search("SCRIPT ERROR|Parse Error|Failed to load script", Path("reports/import.log").read_text())))'
-"$GODOT_BIN" --headless --path . --script tests/test_simulation.gd 2>&1 | tee reports/simulation.log
-"$GODOT_BIN" --headless --path . -- --smoke-test 2>&1 | tee reports/scene.log
+"$GODOT_BIN" --headless --path . --script tests/test_direct_loop.gd 2>&1 | tee reports/direct-loop.log
+"$GODOT_BIN" --headless --path . --script tests/test_adventure.gd 2>&1 | tee reports/simulation.log
+timeout 30s "$GODOT_BIN" --headless --path . -- --smoke-test 2>&1 | tee reports/scene.log
 python3 -c 'import re,sys; from pathlib import Path; sys.exit(bool(re.search("SCRIPT ERROR|^ERROR:", Path("reports/scene.log").read_text(), re.M)))'
 "$GODOT_BIN" --headless --path . --script tests/test_scene.gd -- --smoke-test 2>&1 | tee reports/scene-events.log
 python3 -c 'import re,sys; from pathlib import Path; sys.exit(bool(re.search("SCRIPT ERROR|^ERROR:", Path("reports/scene-events.log").read_text(), re.M)))'

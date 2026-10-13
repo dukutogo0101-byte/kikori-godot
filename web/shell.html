@@ -4,8 +4,8 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
   <meta name="theme-color" content="#173f36">
-  <meta name="description" content="小さな森から、大きな未来へ。木を育て、木材を運び、製材所を強化する3D木こり経営ゲーム。">
-  <title>KIKORI — 小さな森の経営ゲーム</title>
+  <meta name="description" content="小さな森から、大きな未来へ。自分で切り、背負い、橋を建てる。雪の森を開拓する3D木こりゲーム。">
+  <title>KIKORI — 雪の森の木こりゲーム</title>
   <link rel="icon" href="index.icon.png">
   <style>
     :root { color-scheme: light; font-family: system-ui, sans-serif; background: #173f36; color: #f4f0db; }
@@ -29,10 +29,10 @@
 </head>
 <body>
 <main id="frame">
-  <canvas id="canvas" tabindex="0" aria-label="KIKORI 3D木こり経営ゲーム。木こり・トラック・製材所を強化して森を経営します。"></canvas>
+  <canvas id="canvas" tabindex="0" aria-label="KIKORI。ドラッグで主人公を動かし、木を切って背負い、売却と橋の建設で森を開拓します。"></canvas>
   <section id="loading" role="status" aria-live="polite">
     <svg width="72" height="72" viewBox="0 0 128 128" aria-hidden="true"><path d="M64 8 30 58h18L20 92h88L80 58h18Z" fill="#bcea8b"/><path d="M59 88h10v31H59z" fill="#f0c77b"/></svg>
-    <div class="eyebrow">A LITTLE FOREST COMPANY</div>
+    <div class="eyebrow">A LITTLE SNOW TRAIL</div>
     <h1>KIKORI</h1>
     <div id="detail">森を準備しています…<br>初回は少し時間がかかります。</div>
     <progress id="progress" max="100" value="0" aria-label="読み込み状況"></progress>
@@ -45,6 +45,11 @@
   const canvas = document.getElementById('canvas');
   const originalGetContext = canvas.getContext.bind(canvas);
   canvas.getContext = function(type, ...args) {
+    // WebKit's default drawing buffer must remain valid between presentation
+    // and compositing; disposal can otherwise retain an initial frame.
+    if (type === 'webgl2' && /AppleWebKit/.test(navigator.userAgent) && !/Chrome|Chromium|Edg|Android/.test(navigator.userAgent)) {
+      args[0] = { ...(args[0] || {}), preserveDrawingBuffer: true };
+    }
     const context = originalGetContext(type, ...args);
     return type === 'webgl2' ? KikoriProtectWebGL(context) : context;
   };
@@ -82,6 +87,13 @@
     });
   }
   document.addEventListener('contextmenu', event => event.preventDefault());
+  function resetInput() { window.dispatchEvent(new Event('kikori-input-reset')); }
+  window.addEventListener('blur', resetInput);
+  window.addEventListener('resize', resetInput);
+  window.addEventListener('orientationchange', resetInput);
+  canvas.addEventListener('pointercancel', resetInput);
+  canvas.addEventListener('touchcancel', resetInput);
+  canvas.addEventListener('pointerleave', resetInput);
 </script>
 </body>
 </html>

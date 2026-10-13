@@ -1,33 +1,57 @@
-# Phase 1 verification
+# Snow Trail verification
+
+## Verification scope
+
+The repository's current main is the old idle-management release. The direct-control adventure is on `feature/snow-lumber-adventure`, PR #1. No main update, merge or deployment is part of this change.
+
+The managed local executor can run Godot headlessly but cannot bind a localhost TCP server. WebGL input, visual inspection and screenshots therefore run in the PR's GitHub Actions browser environment. Local Godot is 4.6.3; CI uses the pinned official 4.5.2 editor and export templates. Browser engines are Playwright 1.56 Chromium and WebKitGTK, using software rendering.
 
 ## Confirmed locally
 
-- The Godot 4 project imports and starts headlessly using the local 4.6.3 editor. CI builds and tests the pinned 4.5.2 release.
-- Deterministic economy suite: **815 assertions, 0 failures**.
-- Simulation covers production, regeneration, purchases, maximum levels, cooldown, conserved log counts, bounded stock, save validation/round-trip, capped offline progress and one hour of maximum upgrades.
-- Python tooling compiles. Original assets and font provenance documented.
+- Direct movement → chop → collect → sell: 5 checks passed.
+- Adventure suite: 144 checks passed, including a complete physical route with three upgrades, both bridges, workshop and all three resource species.
+- Scene suite: 75 checks passed, including UI input exclusion, touch cancel/release, leaving the viewport, PC input reset, menu pause, and one hour of cosmetic updates with fixed pools.
+- Web framebuffer guard test passed; Python tooling compiles.
+- Save restore validates IDs, counts, harvest cycles, prices, construction contributions and money before committing state. Unsupported schemas and corrupt state are rejected without partial changes.
 
-## Automated CI checks
+## Tempo measured by deterministic input
 
-The release Web export, all 815 simulation assertions, scene event checks, and Chromium/WebKit end-to-end tests passed in [Actions run 38229554117](https://github.com/dukutogo0101-byte/kikori-godot/actions/runs/38229554117). Both browser engines reported zero console/page errors and `gl.getError() == 0`; touch purchases, revenue, reload persistence, rotation and corrupt-save recovery passed. The exported payload is approximately 38.5 MB before compression (9.6 MB zipped).
+This test navigates routes at real game speed, repeatedly chops and collects, sells for upgrades and contributes wood. No time scale, currency grants or unlock commands are used in this route. Deliberation, reading and touch learning time are excluded.
 
-After deployment, the workflow repeats the browser checks against the actual public HTTPS URL. See the latest Actions run and its `kikori-live-reports` artifact for publication verification. These tests use software-rendered browser engines, so their frame rates do not measure mobile-device performance.
+| Milestone | Simulation time |
+|---|---:|
+| First tree | 4.17 seconds |
+| First sale | 15.52 seconds |
+| First upgrade (pack) | 19.40 seconds |
+| First bridge | 189.82 seconds (3:10) |
+| Workshop, second bridge and collecting silver birch | 707 seconds (11:47) |
 
-## Real device acceptance checklist (pending physical devices)
+The first two steps are deliberately quick for practiced input. A new player does not need to wait for funds to accumulate automatically. The first bridge and later landmarks satisfy the 3–5 minute / 10–15 minute progression goals in an efficient route. Actual browser input timing is recorded separately in `chromium-results.json` and `webkit-results.json`; software-renderer waiting time is not a mobile-device performance measurement.
+
+## Browser evidence
+
+The first minimal direct-control loop passed in both Chromium and WebKit, [run 38334797825](https://github.com/dukutogo0101-byte/kikori-godot/actions/runs/38334797825): 30 money earned, empty cargo, no console/page errors. This was an early prototype, before final presentation and progression.
+
+The final PR workflow verifies the full exported adventure; the latest Actions run is authoritative. Its `kikori-test-reports-chromium` / `kikori-test-reports-webkit` artifacts contains actual screenshots and per-engine JSON. Chromium's full route checks touch start/stop/cancel, PC movement, trunk and unbuilt-bridge collision, UI blocking, input resets, sale, all three upgrade types, partial construction/reload, bridge passage, harvesting and selling amber wood, persistent unlocks, rotation, corrupt saves and denied storage. WebKit checks the initial gameplay and save/UI/error paths. Tab activation uses real browser pages where visibility changes are available; headless targets may remain visible, so blur and orientation cancellation also use browser events. No `document.hidden` override is used because it can desynchronize WebKit rendering. Canvas frame hashes must change after movement and carrying, preventing script-only false positives. Physical-device backgrounding remains unverified.
+
+## WebKit presentation
+
+The original shader-only final copy allowed scripts and the offscreen scene to update while the default WebKit drawing image retained the initial frame. A fresh-page movement probe caught this despite zero GL errors. Resolving via one reusable intermediate RGBA framebuffer made source and displayed pixel signatures match and the movement/carry frame hashes change. The production guard contains no debug pixel readbacks or extra shader programs. Safari-family contexts retain their drawing buffer. WebKitGTK evidence uses actual GPU framebuffer pixels because its compositor snapshot and canvas export may return a cached image. Chrome evidence uses normal page screenshots. Neither is physical iOS device certification.
+
+## Bounded rendering
+
+The scene starts with 170 direct children, including fixed pools of 24 flying logs/labels and 24 chips. One hour of repeated events leaves the child count unchanged; active effects settle to zero and pending pickup IDs retire. Ground/cargo are MultiMesh batches capped at 160 / 30 logical logs. Nearby foreground trees fade and lose their shadow temporarily to keep the protagonist visible.
+
+## Real-device acceptance still pending
 
 | Check | Android Chrome | iPhone Safari |
 |---|---|---|
-| Open the deployed HTTPS URL and dismiss loading | Pending | Pending |
-| Forest, shadows, trees, worker and truck visible | Pending | Pending |
-| Observe a tree fall, truck delivery, saw processing, rising funds | Pending | Pending |
-| Tap all three upgrade types and verify funds decrease | Pending | Pending |
-| Boost works for 15 seconds and cooldown prevents repeat | Pending | Pending |
-| Rotate, pinch, reset view | Pending | Pending |
-| Reload restores upgrades and ongoing production | Pending | Pending |
-| Background/return and close/reopen retain saved progress | Pending | Pending |
-| Portrait/landscape, notch and browser toolbar do not hide controls | Pending | Pending |
-| Sound toggles after a tap | Pending | Pending |
-| Ten-minute play session without crash or sustained stutter | Pending | Pending |
-| Storage blocked/private browsing produces a usable fallback | Pending | Pending |
+| Cold load over mobile connection | Pending | Pending |
+| One-handed touch, no stuck input after browser interruptions | Pending | Pending |
+| Notch/toolbars, keyboard, portrait/landscape | Pending | Pending |
+| Ten to fifteen minutes of real play and comfortable camera | Pending | Pending |
+| Background / foreground / close-reopen preservation | Pending | Pending |
+| Audio unlock and opt-in vibration | Pending | Pending |
+| 30fps+ and stable memory on recent mid-range phone | Pending | Pending |
 
-Target performance: 30fps or better on a recent mid-range mobile device. This is a target, not a measured real-device result. The renderer avoids physics-heavy simulation, expensive post-processing, large texture assets and unbounded decorative objects. If a device is memory constrained, reload or close other tabs; if WebGL 2 is unavailable, the loading shell explains the limitation.
+The game is optimized toward 30fps, but no physical-device frame rate, memory or thermal claim has been made. WebKitGTK tests the Safari-family engine; it is not iOS Safari certification. Storage may be cleared by private browsing, device cleanup or user action; unavailable storage leaves a playable in-tab session with a visible indicator.
