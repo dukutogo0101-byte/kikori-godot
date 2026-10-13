@@ -16,7 +16,7 @@ concurrency:
 jobs:
   build:
     runs-on: ubuntu-24.04
-    timeout-minutes: 20
+    timeout-minutes: 35
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
@@ -36,7 +36,7 @@ jobs:
           pip install playwright==1.56.0
           python3 -m playwright install --with-deps chromium webkit
       - name: Chromium WebGL end-to-end test
-        run: python3 tests/browser_smoke.py --engine chromium
+        run: python3 tests/browser_smoke.py --engine chromium --full
       - name: Safari engine WebGL end-to-end test
         run: xvfb-run -a python3 tests/browser_smoke.py --engine webkit
         env:

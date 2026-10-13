@@ -1,7 +1,7 @@
 extends RefCounted
 ## localStorage is synchronous, durable across reloads, and independent of IndexedDB flushes.
-const KEY = "kikori.phase1.v1"
-const FILE = "user://kikori_save.json"
+const KEY = "kikori.adventure.v2"
+const FILE = "user://kikori_adventure_v2.json"
 const MAX_BYTES = 100000
 var available = true
 var message = ""

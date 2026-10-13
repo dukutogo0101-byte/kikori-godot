@@ -26,7 +26,7 @@ var notice = "森へドラッグして移動。木のそばで止まろう"
 
 func _init() -> void:
  for item in Defs.tree_layout():
-  trees.append({"position": item.position, "kind": item.kind, "hp": Defs.KINDS[item.kind].hp, "regrow": 0.0, "fall": 0.0, "cycle": 0})
+  trees.append({"position": item.position, "kind": item.kind, "hp": Defs.KINDS[item.kind].hp, "regrow": 0.0, "fall": 0.0, "cycle": 0, "harvested": false})
 
 func capacity() -> int:
  return 6 + int(levels.pack) * 4
@@ -102,6 +102,7 @@ func tick(delta: float, direction: Vector2) -> void:
    tree.regrow = maxf(0, tree.regrow - dt)
    if tree.regrow <= 0 and tree.position.distance_to(position) > 1.1:
     tree.hp = Defs.KINDS[tree.kind].hp
+    tree.harvested = false
     events.append({"type": "regrow", "position": tree.position})
  pickup()
  if direction.length() > 0.05:
@@ -148,6 +149,8 @@ func tick(delta: float, direction: Vector2) -> void:
 
 func fell(index: int) -> void:
  var tree = trees[index]
+ if tree.hp > 0 or tree.harvested: return
+ tree.harvested = true
  tree.regrow = Defs.KINDS[tree.kind].regrow
  tree.fall = 0.72
  tree.cycle += 1
@@ -167,9 +170,10 @@ func pickup() -> void:
    var log = ground[i]
    bag.append({"id": log.id, "kind": log.kind})
    ground.remove_at(i)
-   events.append({"type": "pickup", "from": log.position, "kind": log.kind})
+   events.append({"type": "pickup", "from": log.position, "kind": log.kind, "id": log.id})
 
 func unload(delta: float, destination: String) -> void:
+ if destination != "sale" and (not projects.has(destination) or complete(destination)): return
  if bag.is_empty():
   transfer_clock = 0
   return
@@ -184,14 +188,14 @@ func unload(delta: float, destination: String) -> void:
    money += amount
    sold[log.kind] += 1
    if first_sale < 0: first_sale = elapsed
-   events.append({"type": "sell", "kind": log.kind, "amount": amount, "to": end})
+   events.append({"type": "sell", "id": log.id, "kind": log.kind, "amount": amount, "to": end})
    notice = "売上！ リュックや斧を強化してみよう"
   else:
    projects[destination] += 1
    spent[log.kind] += 1
    for project in Defs.PROJECTS:
     if project.id == destination: end = project.position
-   events.append({"type": "deposit", "kind": log.kind, "to": end})
+   events.append({"type": "deposit", "id": log.id, "kind": log.kind, "to": end})
    if complete(destination):
     if destination == "bridge": bridge_time = elapsed
     events.append({"type": "complete", "id": destination, "position": end})
@@ -215,3 +219,128 @@ func conserved() -> bool:
   for log in ground: held += 1 if log.kind == kind else 0
   if created[kind] != held + sold[kind] + spent[kind]: return false
  return true
+
+func snapshot() -> Dictionary:
+ var state = {"version": 2, "position": [position.x, position.y], "facing": [facing.x, facing.y], "money": money, "levels": levels.duplicate(), "projects": projects.duplicate(), "created": created.duplicate(), "sold": sold.duplicate(), "spent": spent.duplicate(), "next_id": next_id, "elapsed": elapsed, "timings": [first_cut,first_sale,first_upgrade,bridge_time], "trees": [], "ground": [], "bag": bag.duplicate(true)}
+ for tree in trees:
+  state.trees.append({"hp": tree.hp, "regrow": tree.regrow, "fall": tree.fall, "cycle": tree.cycle})
+ for log in ground:
+  state.ground.append({"id": log.id, "kind": log.kind, "position": [log.position.x, log.position.y]})
+ return state
+
+static func number(v, low: float, high: float, integer: bool = false) -> bool:
+ return (v is float or v is int) and is_finite(float(v)) and float(v) >= low and float(v) <= high and (not integer or float(v) == floor(float(v)))
+
+static func pair(v) -> bool:
+ return v is Array and v.size() == 2 and number(v[0],-1000,1000) and number(v[1],-1000,1000)
+
+func restore(data: Dictionary) -> bool:
+ # Build a candidate: failures leave this game completely unchanged.
+ if data.get("version") != 2: return false
+ var candidate = get_script().new()
+ for key in ["position","facing"]:
+  if not pair(data.get(key)): return false
+ if not number(data.get("money"),0,1e10,true) or not number(data.get("next_id"),1,1e8,true) or not number(data.get("elapsed"),0,1e9): return false
+ for group in ["levels","projects"]:
+  if not data.get(group) is Dictionary: return false
+ for key in levels:
+  if not number(data.levels.get(key),0,Defs.MAX_LEVEL,true): return false
+  candidate.levels[key] = int(data.levels[key])
+ for project in Defs.PROJECTS:
+  if not number(data.projects.get(project.id),0,project.need,true): return false
+  candidate.projects[project.id] = int(data.projects[project.id])
+ if not candidate.complete("bridge") and (candidate.projects.workshop > 0 or candidate.projects.high_bridge > 0): return false
+ for group in ["created","sold","spent"]:
+  if not data.get(group) is Array or data[group].size() != 3: return false
+  for i in 3:
+   if not number(data[group][i],0,1e8,true): return false
+  candidate.set(group, [int(data[group][0]),int(data[group][1]),int(data[group][2])])
+ var total = candidate.created[0]+candidate.created[1]+candidate.created[2]
+ if data.next_id != total + 1: return false
+ if candidate.spent[0]+candidate.spent[1]+candidate.spent[2] != candidate.projects.bridge + candidate.projects.workshop + candidate.projects.high_bridge: return false
+ if not data.get("trees") is Array or data.trees.size() != trees.size(): return false
+ var produced = [0,0,0]
+ for i in trees.size():
+  var t = data.trees[i]
+  var kind = trees[i].kind
+  if not t is Dictionary or not number(t.get("hp"),0,Defs.KINDS[kind].hp,true) or not number(t.get("regrow"),0,Defs.KINDS[kind].regrow) or not number(t.get("fall"),0,0.72) or not number(t.get("cycle"),0,1e7,true): return false
+  if t.hp > 0 and (t.regrow != 0 or t.fall != 0): return false
+  if t.hp == 0 and t.cycle == 0: return false
+  candidate.trees[i].hp = int(t.hp)
+  candidate.trees[i].harvested = int(t.hp) == 0
+  candidate.trees[i].regrow = float(t.regrow)
+  candidate.trees[i].fall = float(t.fall)
+  candidate.trees[i].cycle = int(t.cycle)
+  produced[kind] += int(t.cycle) * Defs.KINDS[kind]["yield"]
+ if produced != candidate.created: return false
+ var ids = {}
+ if not data.get("bag") is Array or data.bag.size() > candidate.capacity(): return false
+ if not data.get("ground") is Array or data.ground.size() > Defs.MAX_GROUND: return false
+ for group in ["bag","ground"]:
+  for log in data[group]:
+   if not log is Dictionary or not number(log.get("id"),1,total,true) or not number(log.get("kind"),0,2,true): return false
+   var id = int(log.id)
+   var kind = int(log.kind)
+   if ids.has(id) or not candidate.area_open(kind): return false
+   ids[id] = true
+   var restored = {"id": id,"kind": kind}
+   if group == "ground":
+    if not pair(log.get("position")): return false
+    var at = Vector2(log.position[0],log.position[1])
+    if not Defs.AREAS[kind].grow(1).has_point(at): return false
+    restored.position = at
+   candidate.get(group).append(restored)
+ if not candidate.conserved(): return false
+ if not data.get("timings") is Array or data.timings.size() != 4: return false
+ for v in data.timings:
+  if not number(v,-1,data.elapsed): return false
+ candidate.first_cut = float(data.timings[0])
+ candidate.first_sale = float(data.timings[1])
+ candidate.first_upgrade = float(data.timings[2])
+ candidate.bridge_time = float(data.timings[3])
+ # Money can only come from sold logs. Validate it against recorded purchases.
+ var costs = 0
+ for key in candidate.levels:
+  for level in candidate.levels[key]: costs += int(round(Defs.BASE_PRICES[key] * pow(1.65,level)))
+ var base_income = 0
+ for kind in 3: base_income += candidate.sold[kind] * Defs.KINDS[kind].value
+ var income = int(data.money) + costs
+ if income < base_income or income > int(base_income * (1.5 if candidate.complete("workshop") else 1)): return false
+ candidate.money = int(data.money)
+ candidate.next_id = int(data.next_id)
+ candidate.elapsed = float(data.elapsed)
+ candidate.position = Vector2(data.position[0],data.position[1])
+ if not candidate.walkable(candidate.position): candidate.position = Defs.SPAWN
+ candidate.facing = Vector2(data.facing[0],data.facing[1]).normalized()
+ if candidate.facing == Vector2.ZERO: candidate.facing = Vector2(0,-1)
+ for key in ["position","facing","money","levels","projects","created","sold","spent","next_id","elapsed","first_cut","first_sale","first_upgrade","bridge_time","trees","ground","bag"]:
+  set(key,candidate.get(key))
+ velocity = Vector2.ZERO
+ target = -1
+ chop_clock = 0
+ transfer_clock = 0
+ events.clear()
+ return true
+
+func goal() -> Dictionary:
+ if sold[0] + sold[1] + sold[2] == 0:
+  return {"text": "木を切って、金色の売り場へ", "position": Defs.SALE}
+ if levels.pack == 0:
+  return {"text": "強化でリュックを大きくしよう", "position": Defs.SALE}
+ for project in Defs.PROJECTS:
+  if not complete(project.id):
+   return {"text": "%s  %d / %d 本" % [project.name,projects[project.id],project.need], "position": project.position}
+ return {"text": "銀の森を開拓！ 斧や靴を磨こう", "position": Vector2(0,-36)}
+
+func summary() -> Dictionary:
+ var state = snapshot()
+ state["bag_count"] = bag.size()
+ state["capacity"] = capacity()
+ state["speed"] = speed()
+ state["damage"] = damage()
+ state["target"] = target
+ state["conserved"] = conserved()
+ state["prices"] = {"axe": price("axe"), "pack": price("pack"), "boots": price("boots")}
+ state["layout"] = []
+ for tree in trees: state.layout.append({"position": [tree.position.x,tree.position.y],"kind":tree.kind})
+ return state

@@ -1,98 +1,130 @@
 extends Node3D
+# Scene wiring only. Input, simulation, presentation and menus have separate owners.
 const State = preload("res://scripts/adventure/game_state.gd")
-const Defs = preload("res://scripts/adventure/definitions.gd")
-const Art = preload("res://scripts/art.gd")
 const Controller = preload("res://scripts/adventure/player_controller.gd")
+const World = preload("res://scripts/adventure/world_view.gd")
+const UI = preload("res://scripts/adventure/game_ui.gd")
+const Feedback = preload("res://scripts/adventure/feedback.gd")
+const Store = preload("res://scripts/save_store.gd")
 var game = State.new()
-var art = Art.new()
 var controller = Controller.new()
-var hero: Node3D
-var camera: Camera3D
-var tree_nodes: Array = []
-var logs: Array = []
-var cargo: Array = []
-var status: Label
+var world = World.new()
+var ui = UI.new()
+var feedback = Feedback.new()
+var store = Store.new()
+var paused = false
+var native_smoke = false
+var save_clock = 0.0
 var diagnostic_clock = 0.0
-
-func mesh(parent: Node3D, shape: Mesh, at: Vector3) -> MeshInstance3D:
- var item = MeshInstance3D.new()
- item.mesh = shape
- item.position = at
- parent.add_child(item)
- return item
+var document: JavaScriptObject
+var window: JavaScriptObject
+var visibility_callback: JavaScriptObject
+var reset_callback: JavaScriptObject
+var purchase_lock_until = 0
 
 func _ready() -> void:
- controller.blocked = func(_p): return false
+ native_smoke = "--smoke-test" in OS.get_cmdline_user_args()
+ var data = {} if native_smoke else store.read_save()
+ var restored = false
+ if not data.is_empty():
+  restored = game.restore(data)
+  if not restored: store.message = "保存データを復元できません。新しく始めます"
+ var font = load("res://assets/fonts/KikoriSans.otf")
+ add_child(world)
+ world.setup(game,font)
+ add_child(ui)
+ ui.setup(game,font)
  add_child(controller)
- var environment = WorldEnvironment.new()
- environment.environment = Environment.new()
- environment.environment.background_mode = Environment.BG_COLOR
- environment.environment.background_color = Color("aac8dc")
- environment.environment.ambient_light_source = Environment.AMBIENT_SOURCE_COLOR
- environment.environment.ambient_light_color = Color("eef8ff")
- environment.environment.ambient_light_energy = 0.8
- add_child(environment)
- var sun = DirectionalLight3D.new()
- sun.rotation_degrees = Vector3(-55,-25,0)
- sun.light_energy = 1.2
- add_child(sun)
- art.begin()
- art.box(Vector3(0,-0.4,3),Vector3(18,0.8,20),Color("eff9fc"))
- mesh(self,art.finish(),Vector3.ZERO)
- var tree_mesh = art.tree()
- for tree in game.trees:
-  var node = Node3D.new()
-  node.position = Vector3(tree.position.x,0,tree.position.y)
-  mesh(node,tree_mesh,Vector3.ZERO)
-  add_child(node)
-  tree_nodes.append(node)
- hero = Node3D.new()
- add_child(hero)
- mesh(hero,art.worker(),Vector3.ZERO).scale = Vector3.ONE * 1.25
- for i in 30:
-  var log = mesh(self,art.log_mesh(),Vector3.ZERO)
-  log.visible = false
-  logs.append(log)
- for i in 6:
-  var log = mesh(hero,art.log_mesh(),Vector3.ZERO)
-  log.scale = Vector3.ONE * 0.5
-  log.visible = false
-  cargo.append(log)
- art.begin()
- art.box(Vector3(4,0.03,9),Vector3(2.4,0.06,2.4),Color("f1cb65"))
- mesh(self,art.finish(),Vector3.ZERO)
- camera = Camera3D.new()
- camera.projection = Camera3D.PROJECTION_ORTHOGONAL
- camera.size = 14
- add_child(camera)
- var layer = CanvasLayer.new()
- add_child(layer)
- status = Label.new()
- status.position = Vector2(20,32)
- layer.add_child(status)
- if "--smoke-test" in OS.get_cmdline_user_args():
-  print("KIKORI_DIRECT_LOOP_READY")
+ controller.blocked = ui.blocked
+ add_child(feedback)
+ ui.upgrade_requested.connect(_buy)
+ ui.menu_changed.connect(func(open): controller.reset(); controller.enabled = not open and not paused; game.velocity = Vector2.ZERO)
+ ui.sound_changed.connect(func(on): feedback.sound = on)
+ ui.vibration_changed.connect(func(on): feedback.vibration = on)
+ get_viewport().size_changed.connect(controller.reset)
+ if not store.message.is_empty(): ui.toast(store.message)
+ elif restored: ui.toast("おかえりなさい。続きの森へ！")
+ else: ui.toast("ドラッグで歩こう。木のそばで止まると伐採")
+ if OS.has_feature("web"):
+  document = JavaScriptBridge.get_interface("document")
+  window = JavaScriptBridge.get_interface("window")
+  visibility_callback = JavaScriptBridge.create_callback(_visibility)
+  reset_callback = JavaScriptBridge.create_callback(_reset_input)
+  document.addEventListener("visibilitychange",visibility_callback)
+  window.addEventListener("kikori-input-reset",reset_callback)
+  _visibility([])
+  diagnostics()
+ if native_smoke:
+  print("KIKORI_ADVENTURE_READY trees=%d objects=%s" % [game.trees.size(),world.counts()])
   get_tree().create_timer(2).timeout.connect(func(): get_tree().quit())
 
 func _physics_process(delta: float) -> void:
- game.tick(delta,controller.sample())
+ if world.hero == null: return
+ if not paused and not ui.modal_open:
+  game.tick(delta,controller.sample())
+  for event in game.events:
+   world.handle(event)
+   feedback.event(event)
+   if event.type == "complete":
+    ui.toast(game.notice)
+    _save()
+ save_clock += delta if not paused else 0.0
+ if save_clock>=3:
+  _save()
+
+func _process(delta: float) -> void:
+ if world.hero == null: return
+ world.update(minf(delta,0.1))
+ ui.update(minf(delta,0.1),controller,world.camera)
  diagnostic_clock += delta
- if diagnostic_clock > 0.2:
-  diagnostic_clock = 0
+ if diagnostic_clock>=0.1:
+  diagnostic_clock=0
   diagnostics()
- hero.position = Vector3(game.position.x,0,game.position.y)
- hero.rotation.y = atan2(game.facing.x,game.facing.y)
- for i in tree_nodes.size(): tree_nodes[i].visible = game.trees[i].hp > 0
- for i in logs.size():
-  logs[i].visible = i < game.ground.size()
-  if i < game.ground.size(): logs[i].position = Vector3(game.ground[i].position.x,0.2,game.ground[i].position.y)
- for i in cargo.size():
-  cargo[i].visible = i < game.bag.size()
-  cargo[i].position = Vector3(0,0.8+i*0.19,-0.3)
- camera.position = hero.position + Vector3(0,18,16)
- camera.look_at(hero.position + Vector3(0,0.5,0))
- status.text = "KIKORI   資金 %d   荷物 %d/%d\n%s" % [game.money,game.bag.size(),game.capacity(),game.notice]
+
+func _buy(key: String) -> void:
+ if Time.get_ticks_msec() < purchase_lock_until: return
+ if game.buy(key):
+  purchase_lock_until = Time.get_ticks_msec()+300
+  world.handle({"type":"upgrade","id":key})
+  feedback.event({"type":"upgrade"})
+  ui.toast(game.notice)
+  _save()
+
+func _save() -> void:
+ save_clock=0
+ if native_smoke or ui.root == null: return
+ var previously_available = store.available
+ if not store.write_save(game.snapshot()) and previously_available: ui.toast("保存不可。このタブでは遊べます")
+ ui.save_available = store.available
+
+func _visibility(_args: Array) -> void:
+ var hidden = bool(document.hidden)
+ controller.reset()
+ game.velocity = Vector2.ZERO
+ if hidden: _save()
+ paused = hidden
+ controller.enabled = not hidden and not ui.modal_open
+ # No offline actions: the hero acts only while the player is here.
+
+func _reset_input(_args: Array) -> void:
+ controller.reset()
+ game.velocity = Vector2.ZERO
+
+func _notification(what: int) -> void:
+ if what == NOTIFICATION_APPLICATION_FOCUS_OUT or what == NOTIFICATION_WM_CLOSE_REQUEST:
+  controller.reset()
+  game.velocity=Vector2.ZERO
+  if ui.root != null: _save()
 
 func diagnostics() -> void:
- if OS.has_feature("web"):
-  JavaScriptBridge.eval("window.kikoriReady=true;window.kikoriState=" + JSON.stringify({"position": [game.position.x,game.position.y],"money":game.money,"bag":game.bag.size(),"elapsed":game.elapsed})+";",true)
+ if not OS.has_feature("web"): return
+ var state = game.summary()
+ state["saved"] = store.available
+ state["paused"] = paused
+ state["fps"] = Engine.get_frames_per_second()
+ state["objects"] = world.counts()
+ JavaScriptBridge.eval("window.kikoriReady=true;window.kikoriState="+JSON.stringify(state)+";window.kikoriUi="+JSON.stringify(ui.summary())+";",true)
+
+func _exit_tree() -> void:
+ if document != null and visibility_callback != null: document.removeEventListener("visibilitychange",visibility_callback)
+ if window != null and reset_callback != null: window.removeEventListener("kikori-input-reset",reset_callback)
