@@ -32,8 +32,13 @@ def inspect(browser,url,engine):
  page.on('pageerror',lambda e:errors.append(str(e)))
  page.on('console',lambda e:errors.append(e.text) if e.type=='error' else None)
  page.goto(url);page.wait_for_function('window.kikoriReady && window.kikoriState',timeout=90000)
- move(page,0,3.1);move(page,-2.2,3.1)
- page.wait_for_function('window.kikoriState.bag>=3',timeout=15000)
+ move(page,0,3.1);move(page,-2.45,3.1)
+ try:
+  page.wait_for_function('window.kikoriState.bag>=3',timeout=15000)
+ except Exception:
+  print('KIKORI_FAILED_STATE',state(page),'ERRORS',errors,flush=True)
+  if engine=='chromium':capture(page,'failure')
+  raise
  if engine=='chromium':capture(page,engine+'-carry')
  move(page,0,3.1);move(page,0,9);move(page,4,9)
  page.wait_for_function('window.kikoriState.money>=30',timeout=15000)
