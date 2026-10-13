@@ -216,6 +216,7 @@ func update(delta: float, controller, camera: Camera3D) -> void:
  if game.position.distance_to(Defs.SALE)<1.3: hint = "売り場 · 止まると一本ずつ荷下ろし"
  elif game.bag.size()>=game.capacity(): hint = "満載！ 売り場か建設の青い円へ運ぼう"
  elif game.target>=0: hint = "伐採中 · 動くとすぐに中断できる"
+ if game.target>=0 and game.ground.size()+Defs.KINDS[game.trees[game.target].kind]["yield"]>Defs.MAX_GROUND: hint = "落ちている丸太を先に運ぼう"
  for project in Defs.PROJECTS:
   if game.position.distance_to(project.position)<1.3 and not game.complete(project.id):
    hint = "%s · 止まると木材を投入" % project.name

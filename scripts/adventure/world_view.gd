@@ -11,6 +11,7 @@ var camera: Camera3D
 var trees: Array = []
 var bridges: Array = []
 var workshop: Node3D
+var market: MeshInstance3D
 var ground_batches: Array = []
 var cargo_batches: Array = []
 var labels: Array = []
@@ -28,6 +29,8 @@ var pale_material: StandardMaterial3D
 var hero_material: StandardMaterial3D
 var last_projects = {}
 var completion_clock = 0.0
+var completion_id = ""
+var axe_impact = 0.0
 var camera_anchor = Vector3.ZERO
 var workshop_sign: Label3D
 
@@ -72,12 +75,13 @@ func setup(state, ui_font: Font) -> void:
  environment.environment.background_color = Color("b9dbea")
  environment.environment.ambient_light_source = Environment.AMBIENT_SOURCE_COLOR
  environment.environment.ambient_light_color = Color("e4f4ff")
- environment.environment.ambient_light_energy = 0.65
+ environment.environment.ambient_light_energy = 0.5
  environment.environment.tonemap_mode = Environment.TONE_MAPPER_LINEAR
  add_child(environment)
  var sun = DirectionalLight3D.new()
  sun.rotation_degrees = Vector3(-55,-30,0)
- sun.light_energy = 1.05
+ sun.light_energy = 0.6
+ sun.shadow_opacity = 0.45
  sun.shadow_enabled = true
  sun.directional_shadow_max_distance = 32
  add_child(sun)
@@ -88,7 +92,7 @@ func setup(state, ui_font: Font) -> void:
   art.box(Vector3(-12+fmod(i*7.3,24),-0.94,-47+i*2.8),Vector3(2.4,0.015,0.05),Color("a8d0df"))
  mesh(self,art.finish())
  for i in Defs.AREAS.size(): mesh(self,art.island(Defs.AREAS[i],i))
- mesh(self,art.station(),Vector3(4.2,0,6.3))
+ market = mesh(self,art.station(),Vector3(4.2,0,6.3))
  for i in [1,2]:
   label(self,"琥珀の森 · 24 / 本" if i==1 else "銀の森 · 50 / 本",Vector3(0,0.7,Defs.AREAS[i].end.y-1.1),Color("6b502e") if i==1 else Color("2e6c8b"),43)
  sale_label = label(self,"木材売り場",Vector3(4,0.7,9),Color("61471e"),43)
@@ -183,6 +187,7 @@ func CUT_COLOR() -> Color:
 
 func handle(event: Dictionary) -> void:
  if event.type == "hit":
+  axe_impact = 0.11
   shake[event.tree] = 0.2
   burst(Vector3(event.position.x,0.9,event.position.y),4)
  elif event.type == "fell":
@@ -205,6 +210,7 @@ func handle(event: Dictionary) -> void:
     break
  elif event.type == "complete":
   completion_clock = 0.7
+  completion_id = event.id
   burst(Vector3(event.position.x,1,event.position.y),18)
 
 func burst(at: Vector3, amount: int) -> void:
@@ -222,6 +228,7 @@ func burst(at: Vector3, amount: int) -> void:
 func update(delta: float) -> void:
  clock += delta
  completion_clock = maxf(0,completion_clock-delta)
+ axe_impact = maxf(0,axe_impact-delta)
  var desired = Vector3(game.position.x,0,game.position.y)
  hero.position = hero.position.lerp(desired,1-exp(-35*delta)) if delta>0 else desired
  var angle = atan2(game.facing.x,game.facing.y)
@@ -232,7 +239,7 @@ func update(delta: float) -> void:
  legs[1].rotation.x = -gait*0.55
  body.position.y = absf(gait)*0.035
  body.rotation.z = sin(clock*6)*0.04 if moving and game.bag.size()>=game.capacity() else 0.0
- axe.rotation.x = -0.65 + sin(game.chop_clock/game.cut_interval()*PI)*1.8 if game.target>=0 else -0.25+gait*0.12
+ axe.rotation.x = 1.1 if axe_impact>0 else (-1.2+2.2*pow(game.chop_clock/game.cut_interval(),3) if game.target>=0 else -0.25+gait*0.12)
  axe.rotation.z = -0.25
  load_label.text = "%d / %d%s" % [game.bag.size(),game.capacity(),"  満載" if game.bag.size()>=game.capacity() else ""]
  load_label.position.y = 2.25+minf(game.bag.size()*0.10,1.7)
@@ -248,8 +255,14 @@ func update(delta: float) -> void:
   view.mesh.material_override = pale_material if occluding else null
   view.mesh.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF if occluding else GeometryInstance3D.SHADOW_CASTING_SETTING_ON
  for i in bridges.size():
-  bridges[i].visible = game.complete("bridge" if i==0 else "high_bridge")
+  var id = "bridge" if i==0 else "high_bridge"
+  bridges[i].visible = game.complete(id)
+  bridges[i].scale.y = 1+sin(completion_clock/0.7*PI)*0.15 if completion_id==id else 1
+ for building in [market,workshop]:
+  var occluding = building.position.z > game.position.y and building.position.z < game.position.y+4 and absf(building.position.x-game.position.x)<2
+  building.material_override = pale_material if occluding else null
  workshop.visible = game.complete("workshop")
+ workshop.scale = Vector3.ONE*(1+sin(completion_clock/0.7*PI)*0.08) if completion_id=="workshop" else Vector3.ONE
  workshop_sign.text = "木工工房 · 売値 ×1.5" if workshop.visible else "工房の予定地"
  for i in Defs.PROJECTS.size():
   var p = Defs.PROJECTS[i]

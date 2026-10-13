@@ -34,12 +34,13 @@ func _ready() -> void:
  world.setup(game,font)
  add_child(ui)
  ui.setup(game,font)
+ ui.save_available = store.available
  add_child(controller)
  controller.blocked = ui.blocked
  add_child(feedback)
  ui.upgrade_requested.connect(_buy)
  ui.menu_changed.connect(func(open): controller.reset(); controller.enabled = not open and not paused; game.velocity = Vector2.ZERO)
- ui.sound_changed.connect(func(on): feedback.sound = on)
+ ui.sound_changed.connect(_sound)
  ui.vibration_changed.connect(func(on): feedback.vibration = on)
  get_viewport().size_changed.connect(controller.reset)
  if not store.message.is_empty(): ui.toast(store.message)
@@ -128,3 +129,7 @@ func diagnostics() -> void:
 func _exit_tree() -> void:
  if document != null and visibility_callback != null: document.removeEventListener("visibilitychange",visibility_callback)
  if window != null and reset_callback != null: window.removeEventListener("kikori-input-reset",reset_callback)
+
+func _sound(on: bool) -> void:
+ feedback.sound = on
+ if on: feedback.event({"type":"pickup"})

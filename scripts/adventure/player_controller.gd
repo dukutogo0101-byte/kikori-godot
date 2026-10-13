@@ -18,6 +18,7 @@ func reset() -> void:
 func _input(event: InputEvent) -> void:
  if not enabled: return
  if event is InputEventKey:
+  if event.echo: return
   if event.pressed: keys[event.physical_keycode] = true
   else: keys.erase(event.physical_keycode)
  if event is InputEventScreenTouch:

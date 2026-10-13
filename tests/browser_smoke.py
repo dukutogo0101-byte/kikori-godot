@@ -46,14 +46,36 @@ def tap(page, key):
 
 
 def move(page, x, z):
+    # Coarse keyboard movement, then actual analog mouse input near the target.
+    # Software WebGL may update diagnostics in large batches; avoid oscillating
+    # between opposite keys based on a stale position.
     start = time.monotonic()
     held = set()
     try:
-        while time.monotonic() - start < 30:
+        while time.monotonic() - start < 45:
             p = state(page)['position']
             dx, dz = x - p[0], z - p[1]
             if abs(dx) < .28 and abs(dz) < .28:
                 return
+            if max(abs(dx), abs(dz)) <= 1.1:
+                for key in held:
+                    page.keyboard.up(key)
+                held.clear()
+                page.wait_for_timeout(220)
+                p = state(page)['position']
+                dx, dz = x - p[0], z - p[1]
+                distance = math.hypot(dx, dz)
+                if abs(dx) < .28 and abs(dz) < .28:
+                    return
+                strength = min(.6, max(.16, distance * .42))
+                page.mouse.move(260, 540)
+                page.mouse.down()
+                page.mouse.move(260 + dx / distance * 64 * strength,
+                                540 + dz / distance * 64 * strength)
+                page.wait_for_timeout(240)
+                page.mouse.up()
+                page.wait_for_timeout(220)
+                continue
             wanted = set()
             if abs(dx) > .24:
                 wanted.add('d' if dx > 0 else 'a')
@@ -69,7 +91,7 @@ def move(page, x, z):
     finally:
         for key in held:
             page.keyboard.up(key)
-        page.wait_for_timeout(130)
+        page.wait_for_timeout(160)
 
 
 def path(page, x, z):
@@ -128,6 +150,7 @@ def buy(page, key):
     page.wait_for_function('(k) => window.kikoriState.levels[k] === 1', arg=key, timeout=5000)
     after = state(page)
     assert after['money'] == before['money'] - before['prices'][key]
+    capture(page, page.context.browser.browser_type.name + '-upgrade-' + key)
     tap(page, 'close')
 
 

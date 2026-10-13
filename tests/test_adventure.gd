@@ -184,6 +184,20 @@ func _initialize() -> void:
  check(store.write_save(game.snapshot()),"Atomic native save")
  check(State.new().restore(store.read_save()),"Native save restore")
  DirAccess.remove_absolute("user://kikori_adventure_test.json")
+ # Inventory IDs and upgrades must reject duplication and respect hard limits.
+ game=State.new();fill(0)
+ var duplicate=game.snapshot();duplicate.bag[1].id=duplicate.bag[0].id
+ check(not State.new().restore(duplicate),"Duplicate cargo ID rejected")
+ var maximal=State.new();maximal.money=100000
+ for key in ["axe","pack","boots"]:
+  for level in Defs.MAX_LEVEL:
+   var debit_balance=maximal.money
+   var cost=maximal.price(key)
+   check(maximal.buy(key),"Upgrade is purchasable")
+   check(maximal.money==debit_balance-cost,"Exactly current price charged")
+  var max_balance=maximal.money
+  check(not maximal.buy(key) and maximal.money==max_balance,"Maximum level never charges")
+ check(maximal.capacity()==30,"Maximum displayed and logical capacity agree")
  # Long capped simulation: no growing ground stock or extra logical resources.
  var long=State.new();long.position=Vector2(-2.45,3.1)
  for i in 36000:

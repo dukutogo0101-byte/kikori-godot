@@ -200,7 +200,7 @@ func island(rect: Rect2, kind: int) -> ArrayMesh:
  begin()
  var r = rect.grow(0.45)
  var points = [Vector2(r.position.x+0.6,r.position.y),Vector2(r.end.x-0.6,r.position.y),Vector2(r.end.x,r.position.y+0.6),Vector2(r.end.x,r.end.y-0.6),Vector2(r.end.x-0.6,r.end.y),Vector2(r.position.x+0.6,r.end.y),Vector2(r.position.x,r.end.y-0.6),Vector2(r.position.x,r.position.y+0.6)]
- var snow = [Color("eff8fa"),Color("edeaf3"),Color("e3f4fb")][kind]
+ var snow = [Color("dceaf1"),Color("dedde9"),Color("d3eaf4")][kind]
  for i in points.size():
   var p = points[i]; var q = points[(i+1)%points.size()]
   var a = Vector3(p.x,0,p.y); var b = Vector3(q.x,0,q.y)
