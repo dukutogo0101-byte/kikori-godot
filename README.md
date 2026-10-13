@@ -87,7 +87,7 @@ Actionsの `kikori-test-reports-chromium` / `kikori-test-reports-webkit` にJSON
 
 地面の資源は最大160本、荷物30本、飛翔・木くずは固定48スロット。地面と荷物を種類別MultiMeshで表示します。容量不足の丸太は残し、地面の上限が近いと新たな伐採を待ちます。静的な地形と小物を結合し、木はメッシュを共有します。影は1灯1024px、3Dは80%解像度、重い物理・GI・ポスト処理はありません。
 
-Webはシングルスレッドで、SharedArrayBuffer／COOP／COEPは不要。WebKitのフレームバッファ出力対策 `web/framebuffer_guard.js` は保持しています。[上流報告](https://github.com/godotengine/godot/issues/122816)。Android Chrome／iPhone SafariのWebGL 2を対象にしていますが、実機で安定30fpsを測定したとは主張しません。
+Webはシングルスレッドで、SharedArrayBuffer／COOP／COEPは不要。WebKitのフレームバッファ出力対策 `web/framebuffer_guard.js` は保持し、専用の中間バッファ経由に改善しています。画面サイズに応じたRGBAバッファを1つだけ再利用し、ChromeとWebKitで実際に画像が更新されることを検証します。Safari系では描画バッファを保持します。[上流報告](https://github.com/godotengine/godot/issues/122816)。Android Chrome／iPhone SafariのWebGL 2を対象にしていますが、実機で安定30fpsを測定したとは主張しません。
 
 ## CIと公開の境界
 
