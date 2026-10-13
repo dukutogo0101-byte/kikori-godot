@@ -8,6 +8,8 @@ import argparse
 import base64
 import json
 import hashlib
+import struct
+import zlib
 import math
 import os
 import threading
@@ -22,15 +24,32 @@ KEY = 'kikori.adventure.v2'
 
 def capture(page, name):
     if page.context.browser.browser_type.name == 'webkit':
-        # GTK's compositor snapshot may retain an old WebGL layer. Capture the
-        # actual canvas in its animation frame instead, without changing buffers.
-        encoded = page.evaluate("""() => new Promise(resolve => {
+        # GTK snapshots/toDataURL can reuse an old canvas image. Capture actual
+        # GPU pixels in a frame instead, keeping all framebuffer bindings intact.
+        frame = page.evaluate("""() => new Promise(resolve => {
             let done=false;
-            function finish(){if(done)return;done=true;resolve(document.querySelector('#canvas').toDataURL('image/png').split(',')[1]);}
+            function finish(){
+                if(done)return;done=true;
+                const c=document.querySelector('#canvas'),g=c.getContext('webgl2');
+                const previous=g.getParameter(g.READ_FRAMEBUFFER_BINDING);
+                g.bindFramebuffer(g.READ_FRAMEBUFFER,null);
+                const pixels=new Uint8Array(c.width*c.height*4);
+                g.readPixels(0,0,c.width,c.height,g.RGBA,g.UNSIGNED_BYTE,pixels);
+                g.bindFramebuffer(g.READ_FRAMEBUFFER,previous);
+                let raw='';
+                for(let i=0;i<pixels.length;i+=8192)raw+=String.fromCharCode(...pixels.subarray(i,i+8192));
+                resolve({width:c.width,height:c.height,data:btoa(raw)});
+            }
             setTimeout(finish,2500);
             requestAnimationFrame(() => requestAnimationFrame(finish));
         })""")
-        data = base64.b64decode(encoded)
+        width,height=frame['width'],frame['height']
+        rgba=base64.b64decode(frame['data'])
+        stride=width*4
+        rows=b''.join(b'\0'+rgba[y*stride:(y+1)*stride] for y in reversed(range(height)))
+        def chunk(kind,payload):
+            return struct.pack('>I',len(payload))+kind+payload+struct.pack('>I',zlib.crc32(kind+payload)&0xffffffff)
+        data=b'\x89PNG\r\n\x1a\n'+chunk(b'IHDR',struct.pack('>IIBBBBB',width,height,8,6,0,0,0))+chunk(b'IDAT',zlib.compress(rows))+chunk(b'IEND',b'')
         Path(f'reports/{name}.png').write_bytes(data)
     else:
         data = page.screenshot(path=f'reports/{name}.png')
