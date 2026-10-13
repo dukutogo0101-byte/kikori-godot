@@ -45,6 +45,11 @@
   const canvas = document.getElementById('canvas');
   const originalGetContext = canvas.getContext.bind(canvas);
   canvas.getContext = function(type, ...args) {
+    // WebKit's default drawing buffer must remain valid between presentation
+    // and compositing; disposal can otherwise retain an initial frame.
+    if (type === 'webgl2' && /AppleWebKit/.test(navigator.userAgent) && !/Chrome|Chromium|Edg|Android/.test(navigator.userAgent)) {
+      args[0] = { ...(args[0] || {}), preserveDrawingBuffer: true };
+    }
     const context = originalGetContext(type, ...args);
     return type === 'webgl2' ? KikoriProtectWebGL(context) : context;
   };
