@@ -77,7 +77,7 @@ func _initialize() -> void:
  # Trees, building, shore, closed bridge.
  check(not game.walkable(Vector2(-3.4,3.1)),"Tree trunk collision")
  check(not game.walkable(Vector2(4,6)),"Building collision")
- check(not game.walkable(Vector2(9.1,3)),"Shore collision")
+ check(not game.walkable(Vector2(18.1,3)),"Shore collision")
  check(not game.walkable(Vector2(0,-8.5)),"Unbuilt bridge is impassable")
  check(not game.walkable(Vector2(0,-14)),"Locked island is impassable")
  game.position=Vector2(-3.4,4.2)

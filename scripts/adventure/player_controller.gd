@@ -1,4 +1,5 @@
 extends Node
+const WEB_CODES = {KEY_W:"KeyW",KEY_A:"KeyA",KEY_S:"KeyS",KEY_D:"KeyD",KEY_UP:"ArrowUp",KEY_DOWN:"ArrowDown",KEY_LEFT:"ArrowLeft",KEY_RIGHT:"ArrowRight"}
 var direction = Vector2.ZERO
 var active_touch = -1
 var origin = Vector2.ZERO
@@ -19,6 +20,9 @@ func _input(event: InputEvent) -> void:
  if not enabled: return
  if event is InputEventKey:
   if event.echo: return
+  if OS.has_feature("web") and event.pressed and WEB_CODES.has(event.physical_keycode):
+   var code=WEB_CODES[event.physical_keycode]
+   if bool(JavaScriptBridge.eval("(window.kikoriCanceledKeys || []).includes('%s')" % code,true)): return
   if event.pressed: keys[event.physical_keycode] = true
   else: keys.erase(event.physical_keycode)
  if event is InputEventScreenTouch:

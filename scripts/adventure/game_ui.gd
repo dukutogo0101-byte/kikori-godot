@@ -1,6 +1,8 @@
 extends CanvasLayer
 const Defs = preload("res://scripts/adventure/definitions.gd")
 signal upgrade_requested(key: String)
+signal facility_requested(area: int,key: String)
+signal view_changed
 signal menu_changed(open: bool)
 signal sound_changed(on: bool)
 signal vibration_changed(on: bool)
@@ -14,6 +16,11 @@ var sound_button: Button
 var vibration_button: Button
 var modal: PanelContainer
 var rows = {}
+var facility_rows = {}
+var area_buttons: Array = []
+var selected_area = 0
+var view_button: Button
+var stock_label: Label
 var close_button: Button
 var modal_open = false
 var sound_on = false
@@ -85,9 +92,13 @@ func setup(state, ui_font: Font) -> void:
  root.add_child(money_label)
  bag_label = text("荷物 0 / 6",15)
  root.add_child(bag_label)
- menu_button = button("強化")
+ menu_button = button("道具・設備")
  menu_button.pressed.connect(func(): show_menu(not modal_open))
  root.add_child(menu_button)
+ view_button=button("視野：広い")
+ view_button.add_theme_font_size_override("font_size",13)
+ view_button.pressed.connect(func(): view_changed.emit())
+ root.add_child(view_button)
  goal_label = text("",15)
  goal_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
  root.add_child(goal_label)
@@ -117,22 +128,27 @@ func setup(state, ui_font: Font) -> void:
  modal.add_theme_stylebox_override("panel",style(Color("f0f7fa"),24))
  modal.visible = false
  root.add_child(modal)
+ var layout=VBoxContainer.new()
+ layout.add_theme_constant_override("separation",10)
+ modal.add_child(layout)
  var scroll = ScrollContainer.new()
  scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
- modal.add_child(scroll)
+ scroll.size_flags_vertical=Control.SIZE_EXPAND_FILL
+ layout.add_child(scroll)
  var content = VBoxContainer.new()
  content.size_flags_horizontal = Control.SIZE_EXPAND_FILL
  content.add_theme_constant_override("separation",10)
  scroll.add_child(content)
  var header = HBoxContainer.new()
- content.add_child(header)
- var title = text("旅の道具を強化",22)
+ layout.add_child(header)
+ layout.move_child(header,0)
+ var title = text("道具・設備",22)
  title.size_flags_horizontal = Control.SIZE_EXPAND_FILL
  header.add_child(title)
  close_button = button("閉じる")
  close_button.pressed.connect(func(): show_menu(false))
  header.add_child(close_button)
- content.add_child(text("切る・背負う・歩くが、もっと快適に",13,Color("678698")))
+ content.add_child(text("道具を磨き、お金で働く拠点を育てよう",13,Color("678698")))
  for key in ["axe","pack","boots"]:
   var panel = PanelContainer.new()
   panel.add_theme_stylebox_override("panel",style(Color("e0edf2"),15))
@@ -149,6 +165,34 @@ func setup(state, ui_font: Font) -> void:
   purchase.pressed.connect(func(): upgrade_requested.emit(key))
   row.add_child(purchase)
   rows[key] = {"description":description,"button":purchase}
+ content.add_child(text("森の自動化",21))
+ var tabs=HBoxContainer.new()
+ tabs.add_theme_constant_override("separation",6)
+ content.add_child(tabs)
+ for area in 3:
+  var tab=button(Defs.AREA_NAMES[area])
+  tab.custom_minimum_size.x=80
+  tab.size_flags_horizontal=Control.SIZE_EXPAND_FILL
+  tab.pressed.connect(func(): selected_area=area)
+  tabs.add_child(tab)
+  area_buttons.append(tab)
+ stock_label=text("",13,Color("678698"))
+ stock_label.autowrap_mode=TextServer.AUTOWRAP_WORD_SMART
+ content.add_child(stock_label)
+ for key in ["camp","porter","mill"]:
+  var panel=PanelContainer.new()
+  panel.add_theme_stylebox_override("panel",style(Color("e3eee2"),15))
+  content.add_child(panel)
+  var column=VBoxContainer.new()
+  panel.add_child(column)
+  var description=text("",14)
+  description.autowrap_mode=TextServer.AUTOWRAP_WORD_SMART
+  column.add_child(description)
+  var purchase=button("")
+  purchase.pressed.connect(func(): facility_requested.emit(selected_area,key))
+  column.add_child(purchase)
+  facility_rows[key]={"description":description,"button":purchase}
+ content.add_child(text("倉庫の緑の円で止まると木材を取り出せます。\n自動化はプレイ中に稼働。留守中の作業はありません。",12,Color("678698")))
  var options = HBoxContainer.new()
  options.add_theme_constant_override("separation",8)
  content.add_child(options)
@@ -172,17 +216,20 @@ func resize() -> void:
  var left = (size.x-width)/2
  money_label.position = Vector2(left+16,39)
  money_label.size = Vector2(110,38)
- bag_label.position = Vector2(left+132,49)
- menu_button.position = Vector2(left+width-80,30)
- menu_button.size = Vector2(64,48)
+ money_label.add_theme_font_size_override("font_size",20 if game.money>=100000 else 25)
+ bag_label.position = Vector2(left+125,49)
+ menu_button.position = Vector2(left+width-106,30)
+ menu_button.size = Vector2(94,48)
+ view_button.position=Vector2(left+width-100,132)
+ view_button.size=Vector2(100,44)
  goal_label.position = Vector2(left+16,86)
  goal_label.size = Vector2(width-32,32)
  root.get_node("Hint").position = Vector2(left,size.y-76)
  root.get_node("Hint").size = Vector2(width,58)
  hint_label.position = Vector2(14,9)
  hint_label.size = Vector2(width-28,42)
- modal.size = Vector2(minf(size.x-28,370),minf(size.y-24,490))
- # Container calculates height from its content; scrolling is unnecessary in portrait.
+ modal.size = Vector2(minf(size.x-28,370),minf(size.y-24,660))
+ # Bounded scroll viewport keeps all facility purchases usable in both orientations.
  modal.position = Vector2((size.x-modal.size.x)/2,maxf(8,(size.y-modal.size.y)/2))
  root.get_node("Brand").position = Vector2(left+16,22)
  stick.size = size
@@ -195,7 +242,7 @@ func show_menu(open: bool) -> void:
  resize()
 
 func blocked(at: Vector2) -> bool:
- return modal_open or root.get_node("Top").get_global_rect().has_point(at)
+ return modal_open or root.get_node("Top").get_global_rect().has_point(at) or view_button.get_global_rect().has_point(at)
 
 func toast(value: String) -> void:
  toast_text = value
@@ -213,14 +260,29 @@ func update(delta: float, controller, camera: Camera3D) -> void:
  bag_label.text = "%d / %d 本" % [game.bag.size(),game.capacity()]
  goal_label.text = game.goal().text
  var hint = "ドラッグで移動 · 木のそばで止まると伐採"
- if game.position.distance_to(Defs.SALE)<1.3: hint = "売り場 · 止まると一本ずつ荷下ろし"
+ if game.position.distance_to(game.nearest_sale())<1.3: hint = "売り場 · 止まると一本ずつ荷下ろし"
  elif game.bag.size()>=game.capacity(): hint = "満載！ 売り場か建設の青い円へ運ぼう"
  elif game.target>=0: hint = "伐採中 · 動くとすぐに中断できる"
  if game.target>=0 and game.ground.size()+Defs.KINDS[game.trees[game.target].kind]["yield"]>Defs.MAX_GROUND: hint = "落ちている丸太を先に運ぼう"
  for project in Defs.PROJECTS:
   if game.position.distance_to(project.position)<1.3 and not game.complete(project.id):
    hint = "%s · 止まると木材を投入" % project.name
+ for area in 3:
+  if game.automation.levels[area].camp>0 and game.position.distance_to(Defs.CAMPS[area])<1.3:
+   hint="倉庫 · 止まると木材を取り出す（建設にも使える）"
  hint_label.text = toast_text if toast_time>0 else hint
+ view_button.text="視野：最大" if game.wide_view else "視野：広い"
+ for area in 3:
+  area_buttons[area].text=("● " if selected_area==area else "")+Defs.AREA_NAMES[area]
+ var auto=game.automation
+ var open=game.area_open(selected_area)
+ stock_label.text="倉庫 %d / %d 本 · 作業員の荷物 %d 本" % [auto.stocks[selected_area].size(),auto.capacity(selected_area),auto.cutters[selected_area].cargo.size()+auto.porters[selected_area].cargo.size()] if open else "橋を完成すると、この森にも設備を建てられます"
+ for key in facility_rows:
+  var level=int(auto.levels[selected_area][key])
+  var effect="威力 %d → %d / 倉庫 %d 本" % [level,mini(level+1,Defs.AUTO_MAX_LEVEL),12+mini(level+1,Defs.AUTO_MAX_LEVEL)*8] if key=="camp" else ("一度に %d → %d 本運搬" % [4+level*4,4+mini(level+1,Defs.AUTO_MAX_LEVEL)*4] if key=="porter" else "売値 +%d%% → +%d%%" % [level*25,mini(level+1,Defs.AUTO_MAX_LEVEL)*25])
+  facility_rows[key].description.text="%s  Lv.%d / %d\n%s\n%s" % [Defs.AUTOMATION[key].name,level,Defs.AUTO_MAX_LEVEL,Defs.AUTOMATION[key].description,effect]
+  facility_rows[key].button.text="橋で解放" if not open else ("伐採所が必要" if key!="camp" and auto.levels[selected_area].camp==0 else ("MAX" if level>=Defs.AUTO_MAX_LEVEL else "%d  ·  %s" % [auto.price(selected_area,key),"建設" if level==0 else "強化"]))
+  facility_rows[key].button.disabled=not auto.can_buy(game,selected_area,key)
  for key in rows:
   var level = game.levels[key]
   var next = mini(Defs.MAX_LEVEL,level+1)
@@ -244,8 +306,10 @@ func update(delta: float, controller, camera: Camera3D) -> void:
 
 func summary() -> Dictionary:
  var result = {"width":get_viewport().get_visible_rect().size.x,"height":get_viewport().get_visible_rect().size.y,"modal":modal_open}
- var nodes = {"menu":menu_button,"close":close_button,"sound":sound_button,"vibration":vibration_button}
+ var nodes = {"menu":menu_button,"close":close_button,"sound":sound_button,"vibration":vibration_button,"view":view_button}
  for key in rows: nodes[key] = rows[key].button
+ for key in facility_rows: nodes[key]=facility_rows[key].button
+ for area in 3: nodes["area%d" % area]=area_buttons[area]
  for key in nodes:
   var center = nodes[key].get_global_rect().get_center()
   result[key] = {"x":center.x,"y":center.y}

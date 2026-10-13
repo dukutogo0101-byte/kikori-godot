@@ -341,6 +341,7 @@ def inspect(browser, url, engine, full):
         # Wide controls must remain usable; resizing cannot leave a held input.
         page.keyboard.down('s')
         page.set_viewport_size({'width': 844, 'height': 390})
+        page.wait_for_function('window.kikoriUi.width > window.kikoriUi.height && window.kikoriState.velocity.every(v => v === 0)', timeout=10000)
         page.wait_for_timeout(300)
         stopped = state(page)['position']
         page.wait_for_timeout(250)

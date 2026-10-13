@@ -87,7 +87,23 @@
     });
   }
   document.addEventListener('contextmenu', event => event.preventDefault());
-  function resetInput() { window.dispatchEvent(new Event('kikori-input-reset')); }
+  // Godot may consume a queued keydown after the resize reset callback.
+  // Retire keys already held in the DOM until a release or fresh press.
+  const heldCodes = new Set();
+  const canceledCodes = new Set();
+  function publishCanceled() { window.kikoriCanceledKeys = Array.from(canceledCodes); }
+  window.addEventListener('keydown', function (event) {
+    heldCodes.add(event.code);
+    if (!event.repeat) { canceledCodes.delete(event.code); publishCanceled(); }
+  }, true);
+  window.addEventListener('keyup', function (event) {
+    heldCodes.delete(event.code); canceledCodes.delete(event.code); publishCanceled();
+  }, true);
+  function resetInput() {
+    heldCodes.forEach(code => canceledCodes.add(code));
+    publishCanceled();
+    window.dispatchEvent(new Event('kikori-input-reset'));
+  }
   window.addEventListener('blur', resetInput);
   window.addEventListener('resize', resetInput);
   window.addEventListener('orientationchange', resetInput);

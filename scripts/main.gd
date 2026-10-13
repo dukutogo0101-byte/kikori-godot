@@ -41,6 +41,8 @@ func _ready() -> void:
  controller.blocked = ui.blocked
  add_child(feedback)
  ui.upgrade_requested.connect(_buy)
+ ui.facility_requested.connect(_buy_facility)
+ ui.view_changed.connect(func(): game.wide_view=not game.wide_view; controller.reset(); _save())
  ui.menu_changed.connect(func(open): controller.reset(); controller.enabled = not open and not paused; game.velocity = Vector2.ZERO)
  ui.sound_changed.connect(_sound)
  ui.vibration_changed.connect(func(on): feedback.vibration = on)
@@ -93,6 +95,14 @@ func _buy(key: String) -> void:
   ui.toast(game.notice)
   _save()
 
+func _buy_facility(area: int, key: String) -> void:
+ if Time.get_ticks_msec()<purchase_lock_until: return
+ if game.automation.buy(game,area,key):
+  purchase_lock_until=Time.get_ticks_msec()+300
+  feedback.event({"type":"upgrade"})
+  ui.toast(game.notice)
+  _save()
+
 func _save() -> void:
  save_clock=0
  if native_smoke or ui.root == null: return
@@ -126,7 +136,7 @@ func diagnostics() -> void:
  state["paused"] = paused
  state["fps"] = Engine.get_frames_per_second()
  state["objects"] = world.counts()
- state["render"] = {"frames_drawn":Engine.get_frames_drawn(),"process_frames":Engine.get_process_frames(),"hero":[world.hero.position.x,world.hero.position.z],"money_text":ui.money_label.text}
+ state["render"] = {"frames_drawn":Engine.get_frames_drawn(),"process_frames":Engine.get_process_frames(),"hero":[world.hero.position.x,world.hero.position.z],"money_text":ui.money_label.text,"camera_size":world.camera.size}
  JavaScriptBridge.eval("window.kikoriReady=true;window.kikoriState="+JSON.stringify(state)+";window.kikoriUi="+JSON.stringify(ui.summary())+";",true)
 
 func _exit_tree() -> void:

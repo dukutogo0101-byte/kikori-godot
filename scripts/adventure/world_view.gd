@@ -12,6 +12,10 @@ var trees: Array = []
 var bridges: Array = []
 var workshop: Node3D
 var market: MeshInstance3D
+var markets: Array = []
+var camps: Array = []
+var workers: Array = []
+var carriers: Array = []
 var ground_batches: Array = []
 var cargo_batches: Array = []
 var labels: Array = []
@@ -83,7 +87,7 @@ func setup(state, ui_font: Font) -> void:
  sun.light_energy = 0.6
  sun.shadow_opacity = 0.45
  sun.shadow_enabled = true
- sun.directional_shadow_max_distance = 32
+ sun.directional_shadow_max_distance = 45
  add_child(sun)
  # A calm frozen river under the raised snowy banks.
  art.begin()
@@ -93,6 +97,35 @@ func setup(state, ui_font: Font) -> void:
  mesh(self,art.finish())
  for i in Defs.AREAS.size(): mesh(self,art.island(Defs.AREAS[i],i))
  market = mesh(self,art.station(),Vector3(4.2,0,6.3))
+ markets.append(market)
+ for i in range(1,Defs.MARKETS.size()):
+  var sale=Defs.MARKETS[i]
+  var p=sale.position
+  var station=mesh(self,art.station(),Vector3(p.x,0,p.y-2.7))
+  markets.append(station)
+  label(self,sale.name,Vector3(p.x,0.7,p.y),Color("61471e"),43)
+  mesh(self,art.ring(1.23,0.14,Color("e7b651")),Vector3(p.x,0.03,p.y))
+ for area in 3:
+  var p=Defs.CAMPS[area]
+  art.begin()
+  art.box(Vector3(p.x,0.012,p.y-2.7),Vector3(3.2,0.024,2.2),Color("b3cec1"))
+  mesh(self,art.finish())
+  var building=mesh(self,art.camp(),Vector3(p.x,0,p.y-2.7))
+  mesh(self,art.ring(1.1,0.14,Color("69a973")),Vector3(p.x,0.035,p.y))
+  var sign=label(self,"",Vector3(p.x,0.8,p.y),Color("3a7348"),40)
+  var storage=batch(self,art.log_mesh(area),72)
+  var saw=mesh(self,art.sawmill(),Vector3(p.x+1.7,0,p.y-2.7))
+  camps.append({"building":building,"label":sign,"storage":storage,"saw":saw})
+  for collection in [workers,carriers]:
+   var worker=Node3D.new()
+   add_child(worker)
+   var body_mesh=mesh(worker,art.hero_body())
+   body_mesh.scale=Vector3.ONE*0.9
+   var feet=[]
+   for x in [-0.14,0.14]: feet.append(mesh(worker,art.hero_leg(),Vector3(x,0.6,0)))
+   var tool=mesh(worker,art.axe(),Vector3(0.3,1.0,0)) if collection==workers else mesh(worker,art.cart())
+   var cargo=batch(worker,art.log_mesh(area),16)
+   collection.append({"root":worker,"feet":feet,"tool":tool,"cargo":cargo,"previous":Vector3.ZERO})
  for i in [1,2]:
   label(self,"琥珀の森 · 24 / 本" if i==1 else "銀の森 · 50 / 本",Vector3(0,0.7,Defs.AREAS[i].end.y-1.1),Color("6b502e") if i==1 else Color("2e6c8b"),43)
  sale_label = label(self,"木材売り場",Vector3(4,0.7,9),Color("61471e"),43)
@@ -174,7 +207,7 @@ func setup(state, ui_font: Font) -> void:
   chips.append({"node":node,"age":-1.0,"position":Vector3.ZERO,"velocity":Vector3.ZERO})
  camera = Camera3D.new()
  camera.projection = Camera3D.PROJECTION_ORTHOGONAL
- camera.size = 13.6
+ camera.size = 28.0
  camera.far = 90
  add_child(camera)
  camera.position = hero.position+Vector3(0,18,16)
@@ -186,12 +219,14 @@ func CUT_COLOR() -> Color:
  return Art.CUT
 
 func handle(event: Dictionary) -> void:
- if event.type == "hit":
-  axe_impact = 0.11
+ if event.type in ["hit","auto_hit"]:
+  if event.type=="hit": axe_impact = 0.11
   shake[event.tree] = 0.2
   burst(Vector3(event.position.x,0.9,event.position.y),4)
  elif event.type == "fell":
   burst(Vector3(event.position.x,0.7,event.position.y),9)
+ elif event.type == "auto_sell":
+  burst(Vector3(event.to.x,0.5,event.to.y),2)
  elif event.type in ["pickup","sell","deposit"]:
   for effect in effects:
    if effect.age < 0:
@@ -258,7 +293,7 @@ func update(delta: float) -> void:
   var id = "bridge" if i==0 else "high_bridge"
   bridges[i].visible = game.complete(id)
   bridges[i].scale.y = 1+sin(completion_clock/0.7*PI)*0.15 if completion_id==id else 1
- for building in [market,workshop]:
+ for building in markets+[workshop]:
   var occluding = building.position.z > game.position.y and building.position.z < game.position.y+4 and absf(building.position.x-game.position.x)<2
   building.material_override = pale_material if occluding else null
  workshop.visible = game.complete("workshop")
@@ -267,6 +302,7 @@ func update(delta: float) -> void:
  for i in Defs.PROJECTS.size():
   var p = Defs.PROJECTS[i]
   labels[i].text = "%s\n%d / %d 本" % [p.name,game.projects[p.id],p.need] if not game.complete(p.id) else "開通！" if p.id != "workshop" else "工房 完成"
+ update_automation(delta)
  var counts = [0,0,0]
  for log in game.ground:
   var transform = Transform3D(Basis(Vector3.UP,float(log.id)*1.7),Vector3(log.position.x,0.18,log.position.y))
@@ -324,11 +360,47 @@ func update(delta: float) -> void:
    chip.age=-1.0
    chip.node.visible=false
  # Follow without rotating the screen's movement axes.
- var camera_size = (15.2 if game.first_cut<0 else 13.6) if get_viewport().get_visible_rect().size.x < get_viewport().get_visible_rect().size.y else 10.5
+ var camera_size = (38.0 if game.wide_view else 28.0) if get_viewport().get_visible_rect().size.x < get_viewport().get_visible_rect().size.y else (24.0 if game.wide_view else 18.0)
  camera.size = lerpf(camera.size,camera_size,1-exp(-3*delta)) if delta>0 else camera_size
  camera_anchor = camera_anchor.lerp(hero.position,1-exp(-7*delta)) if delta>0 else hero.position
  camera.position = camera_anchor+Vector3(0,18,16)
  camera.look_at(camera_anchor+Vector3(0,0.6,0))
+
+func update_automation(delta: float) -> void:
+ for area in 3:
+  var p=Defs.CAMPS[area]
+  var auto=game.automation
+  var camp=camps[area]
+  var active=auto.levels[area].camp>0
+  camp.building.visible=active
+  camp.saw.visible=auto.levels[area].mill>0
+  camp.saw.rotation.y=sin(clock*2)*0.06
+  camp.label.text="%s 倉庫 %d/%d 本" % [Defs.AREA_NAMES[area],auto.stocks[area].size(),auto.capacity(area)] if active else "%s 伐採所予定地\n道具・設備で建設" % Defs.AREA_NAMES[area]
+  var stock=auto.stocks[area]
+  for i in stock.size():
+   var at=Vector3(p.x-1.0+(i%6)*0.35,0.22+floori(float(i)/6)*0.26,p.y-1.4)
+   camp.storage.multimesh.set_instance_transform(i,Transform3D(Basis(Vector3.UP,PI/2).scaled(Vector3.ONE*0.7),at))
+  camp.storage.multimesh.visible_instance_count=stock.size()
+  for role in 2:
+   var view=workers[area] if role==0 else carriers[area]
+   var logic=auto.cutters[area] if role==0 else auto.porters[area]
+   view.root.visible=active if role==0 else auto.levels[area].porter>0
+   var at=Vector3(logic.position.x,0,logic.position.y)
+   var difference=at-view.previous
+   if difference.length()>0.001: view.root.rotation.y=atan2(difference.x,difference.z)
+   elif role==0 and logic.target>=0:
+    var direction=game.trees[logic.target].position-logic.position
+    view.root.rotation.y=atan2(direction.x,direction.y)
+   view.previous=at
+   view.root.position=at
+   var gait=sin(clock*10+area)*0.5 if difference.length()>0.001 else 0.0
+   view.feet[0].rotation.x=gait
+   view.feet[1].rotation.x=-gait
+   if role==0: view.tool.rotation.x=sin(logic.clock/0.65*PI)*1.7 if logic.target>=0 and difference.length()<0.001 else -0.25
+   for i in logic.cargo.size():
+    var cargo_at=Vector3(0,1.0+i*0.15,-0.5) if role==0 else Vector3(0,0.55+floori(float(i)/4)*0.2,-0.8-(i%4)*0.25)
+    view.cargo.multimesh.set_instance_transform(i,Transform3D(Basis(Vector3.UP,PI/2).scaled(Vector3.ONE*0.6),cargo_at))
+   view.cargo.multimesh.visible_instance_count=logic.cargo.size()
 
 func counts() -> Dictionary:
  var active=0
