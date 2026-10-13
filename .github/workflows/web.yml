@@ -74,10 +74,17 @@ jobs:
         run: |
           pip install playwright==1.56.0
           python3 -m playwright install --with-deps "${{ matrix.engine }}"
+      - name: Verify WebKit redraw before gameplay
+        if: matrix.engine == 'webkit'
+        run: xvfb-run -a python3 tests/browser_smoke.py --engine webkit --probe
+        env:
+          LIBGL_ALWAYS_SOFTWARE: '1'
+          WEBKIT_DISABLE_DMABUF_RENDERER: '1'
       - name: Play actual WebGL export
         run: xvfb-run -a python3 tests/browser_smoke.py --engine "${{ matrix.engine }}" ${{ matrix.flags }}
         env:
           LIBGL_ALWAYS_SOFTWARE: '1'
+          WEBKIT_DISABLE_DMABUF_RENDERER: '1'
       - name: Keep browser results and actual screenshots
         if: always()
         uses: actions/upload-artifact@v4

@@ -126,6 +126,7 @@ func diagnostics() -> void:
  state["paused"] = paused
  state["fps"] = Engine.get_frames_per_second()
  state["objects"] = world.counts()
+ state["render"] = {"frames_drawn":Engine.get_frames_drawn(),"process_frames":Engine.get_process_frames(),"hero":[world.hero.position.x,world.hero.position.z],"money_text":ui.money_label.text}
  JavaScriptBridge.eval("window.kikoriReady=true;window.kikoriState="+JSON.stringify(state)+";window.kikoriUi="+JSON.stringify(ui.summary())+";",true)
 
 func _exit_tree() -> void:

@@ -231,6 +231,7 @@ def inspect(browser, url, engine, full):
             page.wait_for_timeout(220)
             assert math.dist(stopped, state(page)['position']) < .03, event + ' must reset input'
             page.keyboard.up('w')
+            if event == 'blur': page.evaluate("window.dispatchEvent(new Event('focus'))")
         # Real tab activation keeps browser/Godot rendering lifecycle coherent.
         # Overriding document.hidden can freeze WebKit's drawing while scripts run.
         page.keyboard.down('w')
@@ -267,6 +268,7 @@ def inspect(browser, url, engine, full):
         finally:
             page.keyboard.up('w')
         page.wait_for_timeout(140)
+        move(page,-6.3,4.8)
         fill(page, 0)
         carry_frame = capture(page, engine + '-carry')
         assert carry_frame != first_frame, 'Rendering must update as the protagonist moves and carries logs'
@@ -358,11 +360,25 @@ def inspect(browser, url, engine, full):
         context.close()
 
 
+def probe(browser, url, engine):
+    context=browser.new_context(viewport={'width':390,'height':844},has_touch=True,is_mobile=True)
+    page=context.new_page();page.bring_to_front();page.goto(url);ready(page)
+    before=state(page)
+    first=capture(page,engine+'-probe-before')
+    page.keyboard.down('w');page.wait_for_timeout(900);page.keyboard.up('w');page.wait_for_timeout(300)
+    after=state(page)
+    second=capture(page,engine+'-probe-after')
+    print('KIKORI_RENDER_PROBE',json.dumps({'before':before.get('render'),'after':after.get('render'),'position':after['position'],'renderer':page.evaluate('window.kikoriRenderer'),'changed':first!=second}),flush=True)
+    assert first!=second, 'Fresh page must visibly redraw after movement'
+    context.close()
+
+
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument('--engine', choices=['all', 'chromium', 'webkit'], default='all')
     parser.add_argument('--url')
     parser.add_argument('--full', action='store_true')
+    parser.add_argument('--probe', action='store_true')
     args = parser.parse_args()
     Path('reports').mkdir(exist_ok=True)
     server = None
@@ -379,6 +395,9 @@ def main():
                     opts['args'] = ['--enable-webgl', '--use-gl=angle', '--use-angle=swiftshader', '--enable-unsafe-swiftshader']
                 browser = getattr(p, engine).launch(**opts)
                 try:
+                    if args.probe:
+                        probe(browser,url,engine)
+                        continue
                     result = inspect(browser, url, engine, args.full)
                     Path(f'reports/{engine}-results.json').write_text(json.dumps(result, indent=2))
                     print('KIKORI_BROWSER_RESULT', json.dumps(result), flush=True)
