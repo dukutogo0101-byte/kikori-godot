@@ -1,5 +1,8 @@
 extends RefCounted
 const Defs = preload("res://scripts/adventure/definitions.gd")
+const Automation = preload("res://scripts/adventure/automation.gd")
+var automation = Automation.new()
+var wide_view = false
 var position = Defs.SPAWN
 var facing = Vector2(0, -1)
 var velocity = Vector2.ZERO
@@ -50,7 +53,7 @@ func area_open(area: int) -> bool:
  return area == 0 or (area == 1 and complete("bridge")) or (area == 2 and complete("high_bridge"))
 
 func value(kind: int) -> int:
- return int(Defs.KINDS[kind].value * (1.5 if complete("workshop") else 1.0))
+ return int(round(Defs.KINDS[kind].value * (1.5 if complete("workshop") else 1.0) * (1.0 + automation.levels[kind].mill*0.25)))
 
 func price(key: String) -> int:
  return int(round(Defs.BASE_PRICES[key] * pow(1.65, levels[key])))
@@ -66,7 +69,7 @@ func walkable(p: Vector2) -> bool:
    var corridor = Defs.BRIDGES[i].grow_individual(-Defs.PLAYER_RADIUS, 0.7, -Defs.PLAYER_RADIUS, 0.7)
    if corridor.has_point(p): inside = true
  if not inside: return false
- for rect in Defs.BUILDINGS:
+ for rect in Defs.building_rects():
   if rect.grow(Defs.PLAYER_RADIUS).has_point(p): return false
  for tree in trees:
   if tree.hp > 0 and tree.position.distance_to(p) < 0.42 + Defs.PLAYER_RADIUS:
@@ -103,17 +106,24 @@ func tick(delta: float, direction: Vector2) -> void:
   tree.fall = maxf(0, tree.fall - dt)
   if tree.hp <= 0:
    tree.regrow = maxf(0, tree.regrow - dt)
-   if tree.regrow <= 0 and tree.position.distance_to(position) > 1.1:
+   if tree.regrow <= 0 and tree.position.distance_to(position) > 1.1 and not automation.blocks_regrowth(tree.position):
     tree.hp = Defs.KINDS[tree.kind].hp
     tree.harvested = false
     events.append({"type": "regrow", "position": tree.position})
+ automation.tick(self,dt)
  pickup()
  if direction.length() > 0.05:
   return
- if position.distance_to(Defs.SALE) < 1.2:
-  target = -1
-  unload(dt, "sale")
-  return
+ for sale in Defs.MARKETS:
+  if area_open(sale.area) and position.distance_to(sale.position)<1.2:
+   target=-1
+   unload(dt,"sale",sale.position)
+   return
+ for area in 3:
+  if area_open(area) and automation.levels[area].camp>0 and position.distance_to(Defs.CAMPS[area])<1.1:
+   target=-1
+   withdraw(dt,area)
+   return
  for project in Defs.PROJECTS:
   if area_open(project.area) and not complete(project.id) and position.distance_to(project.position) < 1.1:
    target = -1
@@ -175,7 +185,7 @@ func pickup() -> void:
    ground.remove_at(i)
    events.append({"type": "pickup", "from": log.position, "kind": log.kind, "id": log.id})
 
-func unload(delta: float, destination: String) -> void:
+func unload(delta: float, destination: String, sale_at: Vector2 = Defs.SALE) -> void:
  if destination != "sale" and (not projects.has(destination) or complete(destination)): return
  if bag.is_empty():
   transfer_clock = 0
@@ -185,13 +195,9 @@ func unload(delta: float, destination: String) -> void:
  while transfer_clock >= interval and not bag.is_empty():
   transfer_clock -= interval
   var log = bag.pop_back()
-  var end = Defs.SALE
+  var end = sale_at
   if destination == "sale":
-   var amount = value(log.kind)
-   money += amount
-   sold[log.kind] += 1
-   if first_sale < 0: first_sale = elapsed
-   events.append({"type": "sell", "id": log.id, "kind": log.kind, "amount": amount, "to": end})
+   sell_log(log,end)
    notice = "売上！ リュックや斧を強化してみよう"
   else:
    projects[destination] += 1
@@ -206,6 +212,33 @@ func unload(delta: float, destination: String) -> void:
     transfer_clock = 0
     break
 
+func nearest_sale() -> Vector2:
+ var nearest=Defs.SALE
+ var distance=1e9
+ for sale in Defs.MARKETS:
+  if area_open(sale.area) and sale.position.distance_to(position)<distance:
+   distance=sale.position.distance_to(position)
+   nearest=sale.position
+ return nearest
+
+func sell_log(log: Dictionary, at: Vector2, automatic: bool = false) -> void:
+ var amount=value(log.kind)
+ money+=amount
+ sold[log.kind]+=1
+ if not automatic and first_sale<0: first_sale=elapsed
+ events.append({"type":"auto_sell" if automatic else "sell","id":log.id,"kind":log.kind,"amount":amount,"to":at})
+
+func withdraw(delta: float, area: int) -> void:
+ if bag.size()>=capacity() or automation.stocks[area].is_empty():
+  transfer_clock=0
+  return
+ transfer_clock+=delta
+ while transfer_clock>=0.105 and bag.size()<capacity() and not automation.stocks[area].is_empty():
+  transfer_clock-=0.105
+  var log=automation.stocks[area].pop_back()
+  bag.append(log)
+  events.append({"type":"pickup","from":Defs.CAMPS[area],"kind":log.kind,"id":log.id})
+
 func buy(key: String) -> bool:
  if not levels.has(key) or levels[key] >= Defs.MAX_LEVEL or money < price(key): return false
  money -= price(key)
@@ -217,14 +250,14 @@ func buy(key: String) -> bool:
 
 func conserved() -> bool:
  for kind in 3:
-  var held = 0
+  var held = automation.held(kind)
   for log in bag: held += 1 if log.kind == kind else 0
   for log in ground: held += 1 if log.kind == kind else 0
   if created[kind] != held + sold[kind] + spent[kind]: return false
  return true
 
 func snapshot() -> Dictionary:
- var state = {"version": 2, "position": [position.x, position.y], "facing": [facing.x, facing.y], "money": money, "levels": levels.duplicate(), "projects": projects.duplicate(), "created": created.duplicate(), "sold": sold.duplicate(), "spent": spent.duplicate(), "next_id": next_id, "elapsed": elapsed, "timings": [first_cut,first_sale,first_upgrade,bridge_time], "trees": [], "ground": [], "bag": bag.duplicate(true)}
+ var state = {"version": 3, "automation": automation.snapshot(), "wide_view": wide_view, "position": [position.x, position.y], "facing": [facing.x, facing.y], "money": money, "levels": levels.duplicate(), "projects": projects.duplicate(), "created": created.duplicate(), "sold": sold.duplicate(), "spent": spent.duplicate(), "next_id": next_id, "elapsed": elapsed, "timings": [first_cut,first_sale,first_upgrade,bridge_time], "trees": [], "ground": [], "bag": bag.duplicate(true)}
  for tree in trees:
   state.trees.append({"hp": tree.hp, "regrow": tree.regrow, "fall": tree.fall, "cycle": tree.cycle})
  for log in ground:
@@ -239,7 +272,8 @@ static func pair(v) -> bool:
 
 func restore(data: Dictionary) -> bool:
  # Build a candidate: failures leave this game completely unchanged.
- if data.get("version") != 2: return false
+ if data.get("version") != 2 and data.get("version") != 3: return false
+ var legacy = data.version==2
  var candidate = get_script().new()
  for key in ["position","facing"]:
   if not pair(data.get(key)): return false
@@ -263,9 +297,9 @@ func restore(data: Dictionary) -> bool:
  var total = candidate.created[0]+candidate.created[1]+candidate.created[2]
  if data.next_id != total + 1: return false
  if candidate.spent[0]+candidate.spent[1]+candidate.spent[2] != candidate.projects.bridge + candidate.projects.workshop + candidate.projects.high_bridge: return false
- if not data.get("trees") is Array or data.trees.size() != trees.size(): return false
+ if not data.get("trees") is Array or data.trees.size() != (Defs.legacy_tree_layout().size() if legacy else trees.size()): return false
  var produced = [0,0,0]
- for i in trees.size():
+ for i in data.trees.size():
   var t = data.trees[i]
   var kind = trees[i].kind
   if not t is Dictionary or not number(t.get("hp"),0,Defs.KINDS[kind].hp,true) or not number(t.get("regrow"),0,Defs.KINDS[kind].regrow) or not number(t.get("fall"),0,0.72) or not number(t.get("cycle"),0,1e7,true): return false
@@ -295,6 +329,10 @@ func restore(data: Dictionary) -> bool:
     if not Defs.AREAS[kind].grow(1).has_point(at): return false
     restored.position = at
    candidate.get(group).append(restored)
+ if not legacy:
+  if not data.get("wide_view") is bool: return false
+  candidate.wide_view=data.wide_view
+  if not candidate.automation.restore(data.get("automation"),candidate,ids,total): return false
  if not candidate.conserved(): return false
  if not data.get("timings") is Array or data.timings.size() != 4: return false
  for v in data.timings:
@@ -304,13 +342,15 @@ func restore(data: Dictionary) -> bool:
  candidate.first_upgrade = float(data.timings[2])
  candidate.bridge_time = float(data.timings[3])
  # Money can only come from sold logs. Validate it against recorded purchases.
- var costs = 0
+ var costs = candidate.automation.costs()
  for key in candidate.levels:
   for level in candidate.levels[key]: costs += int(round(Defs.BASE_PRICES[key] * pow(1.65,level)))
  var base_income = 0
  for kind in 3: base_income += candidate.sold[kind] * Defs.KINDS[kind].value
  var income = int(data.money) + costs
- if income < base_income or income > int(base_income * (1.5 if candidate.complete("workshop") else 1)): return false
+ var maximum_income=0
+ for kind in 3: maximum_income+=candidate.sold[kind]*candidate.value(kind)
+ if income < base_income or income > maximum_income: return false
  candidate.money = int(data.money)
  candidate.next_id = int(data.next_id)
  candidate.elapsed = float(data.elapsed)
@@ -318,7 +358,7 @@ func restore(data: Dictionary) -> bool:
  if not candidate.walkable(candidate.position): candidate.position = Defs.SPAWN
  candidate.facing = Vector2(data.facing[0],data.facing[1]).normalized()
  if candidate.facing == Vector2.ZERO: candidate.facing = Vector2(0,-1)
- for key in ["position","facing","money","levels","projects","created","sold","spent","next_id","elapsed","first_cut","first_sale","first_upgrade","bridge_time","trees","ground","bag"]:
+ for key in ["automation","wide_view","position","facing","money","levels","projects","created","sold","spent","next_id","elapsed","first_cut","first_sale","first_upgrade","bridge_time","trees","ground","bag"]:
   set(key,candidate.get(key))
  velocity = Vector2.ZERO
  target = -1
@@ -342,7 +382,7 @@ func goal() -> Dictionary:
   var cargo_value = 0
   for log in bag: cargo_value += value(log.kind)
   if not bag.is_empty() and (first_delivery or bag.size()>=capacity() or money+cargo_value>=price("pack")):
-   return {"text": "丸太を金色の売り場へ", "position": Defs.SALE, "label": "売り場"}
+   return {"text": "丸太を金色の売り場へ", "position": nearest_sale(), "label": "売り場"}
   var text = "木のそばで止まって伐採" if first_delivery else "木材を売って強化  %d / %d" % [money,price("pack")]
   return {"text": text, "position": nearest_tree_position(), "label": "木"}
  if levels.pack == 0:
@@ -350,6 +390,8 @@ func goal() -> Dictionary:
  for project in Defs.PROJECTS:
   if not complete(project.id):
    return {"text": "%s  %d / %d 本" % [project.name,projects[project.id],project.need], "position": project.position, "label": "工房" if project.id == "workshop" else "橋"}
+ if automation.levels[0].camp==0:
+  return {"text":"道具・設備で自動伐採所を建てよう", "position":Defs.CAMPS[0], "label":"伐採所"}
  return {"text": "銀の森を開拓！ 斧や靴を磨こう", "position": Vector2(0,-36), "label": "白樺"}
 
 func summary() -> Dictionary:
@@ -359,8 +401,11 @@ func summary() -> Dictionary:
  state["speed"] = speed()
  state["damage"] = damage()
  state["target"] = target
+ state["velocity"] = [velocity.x,velocity.y]
  state["conserved"] = conserved()
  state["prices"] = {"axe": price("axe"), "pack": price("pack"), "boots": price("boots")}
+ state["markets"] = []
+ for sale in Defs.MARKETS: state.markets.append({"position":[sale.position.x,sale.position.y],"area":sale.area,"open":area_open(sale.area)})
  state["layout"] = []
  for tree in trees: state.layout.append({"position": [tree.position.x,tree.position.y],"kind":tree.kind})
  return state

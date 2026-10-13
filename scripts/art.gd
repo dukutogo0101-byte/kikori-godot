@@ -232,3 +232,35 @@ func ring(radius: float, width: float, color: Color) -> ArrayMesh:
   var a = TAU*i/40; var b = TAU*(i+1)/40
   quad(Vector3(cos(a)*radius,0,sin(a)*radius),Vector3(cos(b)*radius,0,sin(b)*radius),Vector3(cos(b)*(radius-width),0,sin(b)*(radius-width)),Vector3(cos(a)*(radius-width),0,sin(a)*(radius-width)),color)
  return finish()
+
+
+func camp() -> ArrayMesh:
+ begin()
+ box(Vector3(0,0.07,0),Vector3(3.2,0.14,2.2),CUT)
+ for x in [-1.45,1.45]:
+  for z in [-0.95,0.95]: box(Vector3(x,0.9,z),Vector3(0.18,1.8,0.18),WOOD)
+ box(Vector3(0,1.85,0),Vector3(3.6,0.22,2.6),Color("52866b"))
+ box(Vector3(0,1.99,0),Vector3(3.6,0.06,2.6),Color("eaf8fb"))
+ box(Vector3(0,1.5,1.02),Vector3(1.8,0.4,0.09),Color("72b182"))
+ for x in [-1.2,-0.8,-0.4,0.0,0.4,0.8,1.2]:
+  branch(Vector3(x,0.3,-0.85),Vector3(x,0.3,0.65),0.18,0.18,WOOD)
+ return finish()
+
+func cart() -> ArrayMesh:
+ begin()
+ box(Vector3(0,0.4,-1.0),Vector3(1.1,0.12,1.65),CUT)
+ for x in [-0.54,0.54]:
+  box(Vector3(x,0.65,-1.0),Vector3(0.08,0.5,1.65),WOOD)
+  for z in [-0.5,-1.5]: branch(Vector3(x-0.08,0.25,z),Vector3(x+0.08,0.25,z),0.23,0.23,DARK,10)
+ for x in [-0.3,0.3]: box(Vector3(x,0.4,0.0),Vector3(0.07,0.07,0.65),WOOD)
+ return finish()
+
+func sawmill() -> ArrayMesh:
+ begin()
+ box(Vector3(0,0.5,0),Vector3(0.9,1,1.8),TEAL)
+ box(Vector3(0,1.1,0),Vector3(1.2,0.1,2),CUT)
+ branch(Vector3(-0.045,1.35,0),Vector3(0.045,1.35,0),0.42,0.42,Color("b7cbd2"),16)
+ for i in 16:
+  var angle=TAU*i/16
+  box(Vector3(0,1.35+sin(angle)*0.44,cos(angle)*0.44),Vector3(0.12,0.08,0.08),DARK)
+ return finish()

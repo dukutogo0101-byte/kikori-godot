@@ -2,17 +2,26 @@
 
 ## Verification scope
 
-The repository's current main is the old idle-management release. The direct-control adventure is on `feature/snow-lumber-adventure`, PR #1. No main update, merge or deployment is part of this change.
+Main contains the direct-control adventure from PR #1. This expansion is on `feature/expanded-forests-automation`; no main update, merge or deployment is part of this change.
 
-The managed local executor can run Godot headlessly but cannot bind a localhost TCP server. WebGL input, visual inspection and screenshots therefore run in the PR's GitHub Actions browser environment. Local Godot is 4.6.3; CI uses the pinned official 4.5.2 editor and export templates. Browser engines are Playwright 1.56 Chromium and WebKitGTK, using software rendering.
+This expansion was built locally with the pinned official Godot 4.5.2 and single-thread Web templates. Chromium Playwright 1.56 ran the actual Web export over a local HTTP server using software rendering. Local WebKit lacks native dependencies; CI retains the WebKit probe and browser checks. Physical Android/iPhone performance is unmeasured.
 
 ## Confirmed locally
 
 - Direct movement → chop → collect → sell: 5 checks passed.
 - Adventure suite: 144 checks passed, including a complete physical route with three upgrades, both bridges, workshop and all three resource species.
-- Scene suite: 75 checks passed, including UI input exclusion, touch cancel/release, leaving the viewport, PC input reset, menu pause, and one hour of cosmetic updates with fixed pools.
+- Scene suite: 77 checks passed, including UI input exclusion, touch cancel/release, leaving the viewport, PC input reset, menu pause, and one hour of cosmetic updates with fixed pools.
 - Web framebuffer guard test passed; Python tooling compiles.
 - Save restore validates IDs, counts, harvest cycles, prices, construction contributions and money before committing state. Unsupported schemas and corrupt state are rejected without partial changes.
+
+## Expansion checks
+
+- Automation suite: 69 checks passed, including exact purchase costs, prerequisites, regional production/delivery, storage withdrawal, in-transit cargo save/resume, hostile save rejection, progressed v2 migration and one hour of three automated forests.
+- `tests/browser_expansion.py` passed on the actual Web export: fresh-save broad/maximum cameras, four markets / 69 trees, UI exclusion for the zoom button, purchases of all three equipment types through a scrolling modal, real automated sale, reload and portrait/landscape close controls. No console/page errors. The equipment scenario uses a validated earned-revenue fixture from the native tests; it does not claim those purchases were earned by browser play from zero.
+- Visual inspection caught missing new Japanese glyphs. Regenerated the existing OFL font subset and verified the menu screenshots.
+- Browser rotation regression exposed a queued-keydown race. The Web shell now tracks canceled DOM key codes; the controller rejects stale presses after resize/blur until release or a fresh key press. Browser checks wait for the actual resized viewport and zero velocity, rather than a fixed sleep.
+- Export excludes reports and build directories so test images/fixtures are not shipped as game assets.
+- Camera orthographic height: portrait 28 / 38, landscape 18 / 24. These are deliberate zoom levels, not world scale changes.
 
 ## Tempo measured by deterministic input
 
@@ -40,7 +49,7 @@ The original shader-only final copy allowed scripts and the offscreen scene to u
 
 ## Bounded rendering
 
-The scene starts with 170 direct children, including fixed pools of 24 flying logs/labels and 24 chips. One hour of repeated events leaves the child count unchanged; active effects settle to zero and pending pickup IDs retire. Ground/cargo are MultiMesh batches capped at 160 / 30 logical logs. Nearby foreground trees fade and lose their shadow temporarily to keep the protagonist visible.
+The expanded scene starts with 275 direct children, including fixed pools of 24 flying logs/labels and 24 chips. One hour of repeated events leaves the child count unchanged; active effects settle to zero and pending pickup IDs retire. Ground/cargo are MultiMesh batches capped at 160 / 30 logical logs. Nearby foreground trees fade and lose their shadow temporarily to keep the protagonist visible.
 
 ## Real-device acceptance still pending
 
