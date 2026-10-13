@@ -27,11 +27,12 @@ func read_save() -> Dictionary:
 	if raw.length() > MAX_BYTES:
 		message = "保存データを読み込めませんでした。"
 		return {}
-	var parsed = JSON.parse_string(raw)
-	if not parsed is Dictionary:
+	var parser = JSON.new()
+	var error = parser.parse(raw)
+	if error != OK or not parser.data is Dictionary:
 		message = "保存データが破損しています。新しく開始します。"
 		return {}
-	return parsed
+	return parser.data
 
 func write_save(state: Dictionary) -> bool:
 	var payload = state.duplicate(true)
@@ -46,7 +47,12 @@ func write_save(state: Dictionary) -> bool:
 		available = file != null
 		if file:
 			file.store_string(raw)
+			file.flush()
+			available = file.get_error() == OK
 			file.close()
-			available = DirAccess.rename_absolute(file_path + ".tmp", file_path) == OK
+			if available:
+				available = DirAccess.rename_absolute(file_path + ".tmp", file_path) == OK
+			else:
+				DirAccess.remove_absolute(file_path + ".tmp")
 	message = "" if available else "保存できません。ブラウザの保存設定を確認してください。"
 	return available

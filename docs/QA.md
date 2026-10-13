@@ -9,7 +9,7 @@ The managed local executor can run Godot headlessly but cannot bind a localhost 
 ## Confirmed locally
 
 - Direct movement → chop → collect → sell: 5 checks passed.
-- Adventure suite: 142 checks passed, including a complete physical route with three upgrades, both bridges, workshop and all three resource species.
+- Adventure suite: 144 checks passed, including a complete physical route with three upgrades, both bridges, workshop and all three resource species.
 - Scene suite: 75 checks passed, including UI input exclusion, touch cancel/release, leaving the viewport, PC input reset, menu pause, and one hour of cosmetic updates with fixed pools.
 - Web framebuffer guard test passed; Python tooling compiles.
 - Save restore validates IDs, counts, harvest cycles, prices, construction contributions and money before committing state. Unsupported schemas and corrupt state are rejected without partial changes.

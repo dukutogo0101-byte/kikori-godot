@@ -20,7 +20,16 @@ KEY = 'kikori.adventure.v2'
 
 
 def capture(page, name):
-    data = page.screenshot(path=f'reports/{name}.png')
+    if page.context.browser.browser_type.name == 'webkit':
+        # GTK's compositor snapshot may retain an old WebGL layer. Capture the
+        # actual canvas in its animation frame instead, without changing buffers.
+        encoded = page.evaluate("""() => new Promise(resolve =>
+            requestAnimationFrame(() => requestAnimationFrame(() =>
+                resolve(document.querySelector('#canvas').toDataURL('image/png').split(',')[1]))))""")
+        data = base64.b64decode(encoded)
+        Path(f'reports/{name}.png').write_bytes(data)
+    else:
+        data = page.screenshot(path=f'reports/{name}.png')
     os.set_blocking(1, True)
     code = base64.b64encode(data).decode()
     for i in range(0, len(code), 2048):
@@ -222,13 +231,19 @@ def inspect(browser, url, engine, full):
         assert state(page)['paused'] and abs(state(page)['elapsed'] - paused['elapsed']) < .03
         page.evaluate("delete document.hidden;document.dispatchEvent(new Event('visibilitychange'))")
         page.wait_for_timeout(200)
-        # Observe physical trunk collision through actual keys.
-        path(page, 2.45, 3.1)
-        page.keyboard.down('d')
-        page.wait_for_timeout(500)
-        page.keyboard.up('d')
+        # Keep input held while inspecting collision so automatic chopping cannot
+        # remove the tested trunk during a slow browser snapshot.
+        path(page, -6.3, 5.2)
+        page.keyboard.down('w')
+        try:
+            page.wait_for_timeout(1200)
+            collision = state(page)
+            assert collision['trees'][0]['hp'] > 0
+            assert math.dist(collision['position'], [-6.3, 3.1]) >= .74
+            assert collision['position'][1] < 4.1, 'Input must push against the trunk'
+        finally:
+            page.keyboard.up('w')
         page.wait_for_timeout(140)
-        assert math.dist(state(page)['position'], [3.4, 3.1]) >= .74
         fill(page, 0)
         capture(page, engine + '-carry')
         sell(page)

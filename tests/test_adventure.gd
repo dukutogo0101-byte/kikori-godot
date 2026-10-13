@@ -185,6 +185,10 @@ func _initialize() -> void:
  var store=Store.new("user://kikori_adventure_test.json")
  check(store.write_save(game.snapshot()),"Atomic native save")
  check(State.new().restore(store.read_save()),"Native save restore")
+ var damaged=FileAccess.open("user://kikori_adventure_test.json",FileAccess.WRITE)
+ damaged.store_string("{invalid");damaged.close()
+ check(store.read_save().is_empty(),"Malformed JSON becomes a fresh state without console errors")
+ check(not store.message.is_empty(),"Malformed JSON gives a friendly explanation")
  DirAccess.remove_absolute("user://kikori_adventure_test.json")
  # Inventory IDs and upgrades must reject duplication and respect hard limits.
  game=State.new();fill(0)
