@@ -12,12 +12,13 @@ func run() -> void:
  await process_frame
  var c=scene.controller
  var ui=scene.ui
+ var test_y=minf(400,root.get_visible_rect().size.y*0.6)
  var touch=InputEventScreenTouch.new()
  touch.index=0;touch.pressed=true;touch.position=ui.menu_button.get_global_rect().get_center()
  c._input(touch)
  check(c.active_touch==-1,"UI touches never start movement")
- touch.position=Vector2(160,400);c._input(touch)
- var drag=InputEventScreenDrag.new();drag.index=0;drag.position=Vector2(224,336)
+ touch.position=Vector2(160,test_y);c._input(touch)
+ var drag=InputEventScreenDrag.new();drag.index=0;drag.position=Vector2(224,test_y-64)
  c._input(drag)
  check(absf(c.sample().length()-1)<0.001,"Touch diagonal speed normalized")
  touch.pressed=false;c._input(touch)
@@ -26,8 +27,14 @@ func run() -> void:
  touch.canceled=true;c._input(touch)
  check(c.active_touch==-1,"Touch cancellation clears stick")
  touch.canceled=false;c._input(touch)
- drag.position=Vector2(-1,400);c._input(drag)
+ drag.position=Vector2(-1,test_y);c._input(drag)
  check(c.sample()==Vector2.ZERO,"Leaving viewport cancels input")
+ var mouse=InputEventMouseButton.new();mouse.button_index=MOUSE_BUTTON_LEFT;mouse.pressed=true;mouse.position=Vector2(160,test_y)
+ c._input(mouse)
+ var motion=InputEventMouseMotion.new();motion.position=Vector2(224,test_y);c._input(motion)
+ check(c.sample().x==1,"Mouse stick moves right")
+ mouse.pressed=false;c._input(mouse)
+ check(c.sample()==Vector2.ZERO,"Mouse release stops input")
  var key=InputEventKey.new();key.physical_keycode=KEY_W;key.pressed=true;c._input(key)
  check(c.sample().y==-1,"PC physical keys move upward")
  c.reset();check(c.sample()==Vector2.ZERO,"Reset clears held keyboard input")
@@ -38,6 +45,12 @@ func run() -> void:
  scene._physics_process(1.0/60)
  check(scene.game.elapsed==before,"Modal does not consume player's wood")
  ui.show_menu(false)
+ var old_size=root.size
+ root.size=Vector2i(844,390)
+ await process_frame
+ check(root.get_visible_rect().size.x>root.get_visible_rect().size.y,"Landscape viewport expands")
+ root.size=old_size
+ await process_frame
  var count=scene.world.counts().nodes
  # Many presentation events stress the fixed pools; logical resources are untouched.
  for i in 36000:

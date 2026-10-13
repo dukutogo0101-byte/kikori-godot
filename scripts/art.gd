@@ -17,7 +17,7 @@ var material: StandardMaterial3D
 func _init() -> void:
  material = StandardMaterial3D.new()
  material.vertex_color_use_as_albedo = true
- material.vertex_color_is_srgb = true
+ material.vertex_color_is_srgb = false
  material.roughness = 0.92
  material.cull_mode = BaseMaterial3D.CULL_DISABLED
 
@@ -31,7 +31,8 @@ func finish() -> ArrayMesh:
  return surface.commit()
 
 func tri(a: Vector3, b: Vector3, c: Vector3, color: Color) -> void:
- surface.set_color(color)
+ # Compatibility does not implement the material sRGB vertex-color flag.
+ surface.set_color(color.srgb_to_linear())
  surface.add_vertex(a)
  surface.add_vertex(b)
  surface.add_vertex(c)
@@ -88,20 +89,6 @@ func crown(p: Vector3, size: Vector3, color: Color, seed_value: int = 0) -> void
    var v3 = p + Vector3(cos(d) * r1.x * size.x, r1.y * size.y, sin(d) * r1.x * size.z)
    quad(v0, v1, v2, v3, color.lightened(0.025 * ((i + j + seed_value) % 5)))
 
-func tree(variant: int = 0) -> ArrayMesh:
- begin()
- branch(Vector3.ZERO, Vector3(0.06, 2.1, 0), 0.19, 0.1, WOOD)
- for i in 4:
-  var angle = i * 1.7 + variant
-  var end = Vector3(cos(angle) * 0.75, 1.9 + i * 0.16, sin(angle) * 0.65)
-  branch(Vector3(0, 1.3, 0), end, 0.09, 0.035, WOOD, 5)
-  crown(end + Vector3(0, 0.25, 0), Vector3(0.85, 0.65, 0.78), GREEN if i % 2 else DARK_GREEN, i)
- crown(Vector3(0.04, 2.75, 0), Vector3(0.83, 0.85, 0.8), LIGHT_GREEN if variant % 3 == 0 else GREEN)
- for i in 4:
-  var angle = i * PI / 2
-  branch(Vector3(cos(angle) * 0.4, 0.04, sin(angle) * 0.4), Vector3(0, 0.26, 0), 0.045, 0.1, WOOD, 5)
- return finish()
-
 func log_mesh(kind: int = 0) -> ArrayMesh:
  var bark = [WOOD, Color("b5793e"), Color("d8e8ed")][kind]
  begin()
@@ -110,26 +97,6 @@ func log_mesh(kind: int = 0) -> ArrayMesh:
  branch(Vector3(0, 0, 0.655), Vector3(0, 0, 0.66), 0.11, 0.11, CUT, 8)
  for i in 3:
   branch(Vector3(0.02 * i, 0, 0.663 + i * 0.002), Vector3(0.02 * i, 0, 0.665 + i * 0.002), 0.065 - i * 0.018, 0.065 - i * 0.018, bark.lightened(0.18 * i), 8)
- return finish()
-
-func worker() -> ArrayMesh:
- begin()
- box(Vector3(0, 0.61, 0), Vector3(0.36, 0.38, 0.24), ROOF)
- # Plaid shirt, belt, boots, face, beard, brimmed safety helmet.
- for x in [-0.1, 0.1]:
-  box(Vector3(x, 0.61, 0.128), Vector3(0.035, 0.36, 0.01), CREAM.darkened(0.15))
- box(Vector3(0, 0.56, 0.13), Vector3(0.35, 0.028, 0.01), DARK)
- box(Vector3(0, 0.43, 0), Vector3(0.37, 0.075, 0.25), DARK)
- for x in [-0.1, 0.1]:
-  branch(Vector3(x, 0.12, 0), Vector3(x, 0.44, 0), 0.085, 0.09, TEAL, 6)
-  box(Vector3(x, 0.085, 0.04), Vector3(0.17, 0.12, 0.29), DARK)
- branch(Vector3(0, 0.83, 0), Vector3(0, 1.08, 0), 0.15, 0.13, Color("edb27e"), 8)
- box(Vector3(0, 0.86, 0.12), Vector3(0.24, 0.1, 0.065), WOOD)
- for x in [-0.06, 0.06]:
-  box(Vector3(x, 0.98, 0.135), Vector3(0.025, 0.025, 0.018), DARK)
- branch(Vector3(0, 1.07, 0), Vector3(0, 1.17, 0), 0.2, 0.13, Color("f2ba48"), 8)
- box(Vector3(0, 1.07, 0.025), Vector3(0.44, 0.035, 0.36), Color("f2ba48"))
- branch(Vector3(-0.18, 0.75, 0), Vector3(-0.23, 0.52, 0.14), 0.075, 0.06, ROOF, 6)
  return finish()
 
 func axe() -> ArrayMesh:

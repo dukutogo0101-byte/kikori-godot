@@ -240,7 +240,7 @@ func update(delta: float, controller, camera: Camera3D) -> void:
  var at = Vector2(clampf(projected.x,40,size.x-100),clampf(projected.y,155,size.y-110))
  navigation.position = at
  var distance = game.position.distance_to(p)
- navigation.text = "%s %dm" % ["↑" if projected.y<155 else ("↓" if projected.y>size.y-110 else ("←" if projected.x<40 else "→")),int(distance)]
+ navigation.text = "%s %s %dm" % ["↑" if projected.y<155 else ("↓" if projected.y>size.y-110 else ("←" if projected.x<40 else "→")),game.goal().label,int(distance)]
 
 func summary() -> Dictionary:
  var result = {"width":get_viewport().get_visible_rect().size.x,"height":get_viewport().get_visible_rect().size.y,"modal":modal_open}

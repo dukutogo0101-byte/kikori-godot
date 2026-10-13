@@ -2,11 +2,12 @@ extends SceneTree
 const State = preload("res://scripts/adventure/game_state.gd")
 var state = State.new()
 var assertions = 0
+var failures = 0
 func check(ok: bool, message: String) -> void:
  assertions += 1
  if not ok:
+  failures += 1
   push_error(message)
-  quit(1)
 func travel(to: Vector2) -> void:
  for step in 1000:
   var offset = to - state.position
@@ -27,4 +28,4 @@ func _initialize() -> void:
  check(state.money == 30,"Sale earns actual value")
  check(state.conserved(),"Resources conserved after sale")
  print("KIKORI_DIRECT_LOOP assertions=%d first_cut=%.2fs first_sale=%.2fs" % [assertions,cut,state.first_sale])
- quit()
+ quit(1 if failures else 0)

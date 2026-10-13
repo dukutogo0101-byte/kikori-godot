@@ -91,6 +91,8 @@ func _initialize() -> void:
  fill(0)
  check(game.bag.size()==6,"Initial pack holds six")
  var created=game.created.duplicate()
+ game.fell(1)
+ check(game.created==created,"Repeating a fall never duplicates resources")
  idle(2)
  check(game.created==created,"Full bag doesn't spawn more wood")
  snapshot_ok()

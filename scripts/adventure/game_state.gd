@@ -81,15 +81,18 @@ func move(direction: Vector2, delta: float) -> void:
   target = -1
   chop_clock = 0
   transfer_clock = 0
- var destination = position + velocity * delta
- if walkable(destination):
-  position = destination
- else:
-  # Slide on obstacles, rather than snagging on corners.
-  var x = Vector2(destination.x, position.y)
-  if walkable(x): position = x
-  var z = Vector2(position.x, destination.y)
-  if walkable(z): position = z
+ # Subdivide only unusually large steps so upgraded boots cannot skip a trunk.
+ var steps = maxi(1,int(ceil(velocity.length()*delta/(Defs.PLAYER_RADIUS*0.5))))
+ for step in steps:
+  var destination = position + velocity * delta / steps
+  if walkable(destination):
+   position = destination
+  else:
+   # Slide on obstacles, rather than snagging on corners.
+   var x = Vector2(destination.x, position.y)
+   if walkable(x): position = x
+   var z = Vector2(position.x, destination.y)
+   if walkable(z): position = z
 
 func tick(delta: float, direction: Vector2) -> void:
  var dt = clampf(delta, 0, 0.1)
@@ -149,7 +152,7 @@ func tick(delta: float, direction: Vector2) -> void:
 
 func fell(index: int) -> void:
  var tree = trees[index]
- if tree.hp > 0 or tree.harvested: return
+ if tree.hp > 0 or tree.harvested or ground.size()+Defs.KINDS[tree.kind]["yield"]>Defs.MAX_GROUND: return
  tree.harvested = true
  tree.regrow = Defs.KINDS[tree.kind].regrow
  tree.fall = 0.72
@@ -255,6 +258,8 @@ func restore(data: Dictionary) -> bool:
   for i in 3:
    if not number(data[group][i],0,1e8,true): return false
   candidate.set(group, [int(data[group][0]),int(data[group][1]),int(data[group][2])])
+ for kind in 3:
+  if candidate.created[kind]>0 and not candidate.area_open(kind): return false
  var total = candidate.created[0]+candidate.created[1]+candidate.created[2]
  if data.next_id != total + 1: return false
  if candidate.spent[0]+candidate.spent[1]+candidate.spent[2] != candidate.projects.bridge + candidate.projects.workshop + candidate.projects.high_bridge: return false
@@ -322,15 +327,30 @@ func restore(data: Dictionary) -> bool:
  events.clear()
  return true
 
+func nearest_tree_position() -> Vector2:
+ var nearest = position
+ var distance = 1e9
+ for tree in trees:
+  if tree.hp > 0 and area_open(tree.kind) and tree.position.distance_to(position)<distance:
+   nearest = tree.position
+   distance = tree.position.distance_to(position)
+ return nearest
+
 func goal() -> Dictionary:
- if sold[0] + sold[1] + sold[2] == 0:
-  return {"text": "木を切って、金色の売り場へ", "position": Defs.SALE}
+ var first_delivery = sold[0] + sold[1] + sold[2] == 0
+ if first_delivery or (levels.pack == 0 and money<price("pack")):
+  var cargo_value = 0
+  for log in bag: cargo_value += value(log.kind)
+  if not bag.is_empty() and (first_delivery or bag.size()>=capacity() or money+cargo_value>=price("pack")):
+   return {"text": "丸太を金色の売り場へ", "position": Defs.SALE, "label": "売り場"}
+  var text = "木のそばで止まって伐採" if first_delivery else "木材を売って強化  %d / %d" % [money,price("pack")]
+  return {"text": text, "position": nearest_tree_position(), "label": "木"}
  if levels.pack == 0:
-  return {"text": "強化でリュックを大きくしよう", "position": Defs.SALE}
+  return {"text": "強化でリュックを大きくしよう", "position": position, "label": "強化"}
  for project in Defs.PROJECTS:
   if not complete(project.id):
-   return {"text": "%s  %d / %d 本" % [project.name,projects[project.id],project.need], "position": project.position}
- return {"text": "銀の森を開拓！ 斧や靴を磨こう", "position": Vector2(0,-36)}
+   return {"text": "%s  %d / %d 本" % [project.name,projects[project.id],project.need], "position": project.position, "label": "工房" if project.id == "workshop" else "橋"}
+ return {"text": "銀の森を開拓！ 斧や靴を磨こう", "position": Vector2(0,-36), "label": "白樺"}
 
 func summary() -> Dictionary:
  var state = snapshot()

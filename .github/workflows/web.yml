@@ -31,21 +31,11 @@ jobs:
         run: python3 tools/install_godot.py
       - name: Import, simulation tests, scene smoke, release export
         run: bash tools/build_web.sh
-      - name: Install browser engines
-        run: |
-          pip install playwright==1.56.0
-          python3 -m playwright install --with-deps chromium webkit
-      - name: Chromium WebGL end-to-end test
-        run: python3 tests/browser_smoke.py --engine chromium --full
-      - name: Safari engine WebGL end-to-end test
-        run: xvfb-run -a python3 tests/browser_smoke.py --engine webkit
-        env:
-          LIBGL_ALWAYS_SOFTWARE: '1'
-      - name: Keep logs, browser results and screenshots
+      - name: Keep native checks
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: kikori-test-reports
+          name: kikori-native-reports
           path: reports/
       - name: Upload playable Web build
         if: always() && hashFiles('build/web/index.wasm') != ''
@@ -59,9 +49,45 @@ jobs:
         with:
           path: build/web/
 
+  browser:
+    needs: build
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - engine: chromium
+            flags: --full
+          - engine: webkit
+            flags: ''
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - uses: actions/download-artifact@v4
+        with:
+          name: kikori-web
+          path: build/web/
+      - name: Install browser engine
+        run: |
+          pip install playwright==1.56.0
+          python3 -m playwright install --with-deps "${{ matrix.engine }}"
+      - name: Play actual WebGL export
+        run: xvfb-run -a python3 tests/browser_smoke.py --engine "${{ matrix.engine }}" ${{ matrix.flags }}
+        env:
+          LIBGL_ALWAYS_SOFTWARE: '1'
+      - name: Keep browser results and actual screenshots
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: kikori-test-reports-${{ matrix.engine }}
+          path: reports/
+
   deploy:
     if: github.ref == 'refs/heads/main' && github.event_name != 'pull_request'
-    needs: build
+    needs: [build, browser]
     runs-on: ubuntu-24.04
     timeout-minutes: 5
     outputs:

@@ -193,6 +193,7 @@ def inspect(browser, url, engine, full):
         ready(page)
         load_seconds = time.monotonic() - started
         assert state(page)['money'] == 0, 'Old idle-game wealth must not skip the new beginning'
+        capture(page, engine + '-start')
         if engine == 'chromium':
             touch_checks(page, context)
         # Tapping UI and opening a modal must never create movement.
@@ -285,11 +286,13 @@ def inspect(browser, url, engine, full):
         page.wait_for_timeout(250)
         assert math.dist(stopped, state(page)['position']) < .03
         page.keyboard.up('s')
+        assert page.evaluate('window.kikoriUi.width > window.kikoriUi.height'), 'Landscape must fill the window'
         capture(page, engine + '-landscape')
         tap(page, 'menu'); tap(page, 'close')
         # A broken new-format save fails safely; old-format state is also rejected.
         for raw in ['{invalid json', json.dumps({'version': 1, 'money': 1000000})]:
-            page.evaluate('([key,raw]) => localStorage.setItem(key,raw)', [KEY, raw])
+            # Inject after the old document's focus/unload autosave has finished.
+            page.add_init_script('localStorage.setItem(' + json.dumps(KEY) + ',' + json.dumps(raw) + ');')
             page.reload(); ready(page)
             assert state(page)['money'] == 0 and state(page)['projects']['bridge'] == 0
         assert page.evaluate("document.querySelector('#canvas').getContext('webgl2').getError()") == 0
@@ -304,7 +307,7 @@ def inspect(browser, url, engine, full):
         restricted.add_init_script("Storage.prototype.getItem=function(){throw new Error('denied')};Storage.prototype.setItem=function(){throw new Error('denied')};")
         blocked = restricted.new_page(); blocked.goto(url); ready(blocked)
         assert not state(blocked)['saved'] and state(blocked)['money'] == 0
-        blocked.keyboard.down('w'); blocked.wait_for_timeout(300); blocked.keyboard.up('w')
+        blocked.keyboard.down('w'); blocked.wait_for_timeout(300); blocked.keyboard.up('w'); blocked.wait_for_timeout(220)
         assert state(blocked)['position'][1] < 10
         restricted.close()
         return result

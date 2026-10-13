@@ -199,7 +199,7 @@ func handle(event: Dictionary) -> void:
     effect.type = event.type
     effect.id = event.get("id",-1)
     effect.node.mesh = cargo_batches[event.kind].multimesh.mesh
-    effect.from = Vector3(event.from.x,0.2,event.from.y) if event.type == "pickup" else hero.global_position+Vector3(0,1.5,0)
+    effect.from = Vector3(event.from.x,0.2,event.from.y) if event.type == "pickup" else hero.to_global(Vector3(0,0.95+floori(float(game.bag.size())/2)*0.16,-0.42-(game.bag.size()%2)*0.2))
     effect.to = Vector3(event.to.x,0.4,event.to.y) if event.has("to") else hero.global_position
     effect.node.visible = true
     effect.node.scale = Vector3.ONE*0.6
@@ -296,12 +296,18 @@ func update(delta: float) -> void:
   if effect.age < 0: continue
   effect.age += delta
   var progress = minf(1,effect.age/0.34)
-  var end = hero.global_position+Vector3(0,1.3,-0.2) if effect.type == "pickup" else effect.to
+  var index = 0
+  for i in game.bag.size():
+   if game.bag[i].id == effect.id: index = i; break
+  var destination = hero.to_global(Vector3(0,0.95+floori(float(index)/2)*0.16,-0.42-(index%2)*0.2))
+  var end = destination if effect.type == "pickup" else effect.to
   effect.node.position = effect.from.lerp(end,progress)+Vector3(0,sin(progress*PI)*1.1,0)
+  if effect.type == "pickup": effect.node.rotation.y = hero.rotation.y+PI/2
   effect.label.position = effect.to+Vector3(0,1.2+effect.age*1.5,0)
   if progress>=1:
+   var waiting_for_batch = pending.has(effect.id)
    pending.erase(effect.id)
-   effect.node.visible = false
+   effect.node.visible = waiting_for_batch
   if effect.age>=0.7:
    effect.age=-1.0
    effect.node.visible=false
@@ -318,7 +324,8 @@ func update(delta: float) -> void:
    chip.age=-1.0
    chip.node.visible=false
  # Follow without rotating the screen's movement axes.
- camera.size = 13.6 if get_viewport().get_visible_rect().size.x < get_viewport().get_visible_rect().size.y else 10.5
+ var camera_size = (15.2 if game.first_cut<0 else 13.6) if get_viewport().get_visible_rect().size.x < get_viewport().get_visible_rect().size.y else 10.5
+ camera.size = lerpf(camera.size,camera_size,1-exp(-3*delta)) if delta>0 else camera_size
  camera_anchor = camera_anchor.lerp(hero.position,1-exp(-7*delta)) if delta>0 else hero.position
  camera.position = camera_anchor+Vector3(0,18,16)
  camera.look_at(camera_anchor+Vector3(0,0.6,0))

@@ -9,8 +9,8 @@ The managed local executor can run Godot headlessly but cannot bind a localhost 
 ## Confirmed locally
 
 - Direct movement → chop → collect → sell: 5 checks passed.
-- Adventure suite: 141 checks passed, including a complete physical route with three upgrades, both bridges, workshop and all three resource species.
-- Scene suite: 72 checks passed, including UI input exclusion, touch cancel/release, leaving the viewport, PC input reset, menu pause, and one hour of cosmetic updates with fixed pools.
+- Adventure suite: 142 checks passed, including a complete physical route with three upgrades, both bridges, workshop and all three resource species.
+- Scene suite: 75 checks passed, including UI input exclusion, touch cancel/release, leaving the viewport, PC input reset, menu pause, and one hour of cosmetic updates with fixed pools.
 - Web framebuffer guard test passed; Python tooling compiles.
 - Save restore validates IDs, counts, harvest cycles, prices, construction contributions and money before committing state. Unsupported schemas and corrupt state are rejected without partial changes.
 
@@ -32,7 +32,7 @@ The first two steps are deliberately quick for practiced input. A new player doe
 
 The first minimal direct-control loop passed in both Chromium and WebKit, [run 38334797825](https://github.com/dukutogo0101-byte/kikori-godot/actions/runs/38334797825): 30 money earned, empty cargo, no console/page errors. This was an early prototype, before final presentation and progression.
 
-The final PR workflow verifies the full exported adventure; the latest Actions run is authoritative. Its `kikori-test-reports` artifact contains actual screenshots and per-engine JSON. Chromium's full route checks touch start/stop/cancel, PC movement, trunk and unbuilt-bridge collision, UI blocking, input resets, sale, all three upgrade types, partial construction/reload, bridge passage, harvesting and selling amber wood, persistent unlocks, rotation, corrupt saves and denied storage. WebKit checks the initial gameplay and save/UI/error paths. Visibility and blur cancellation include injected browser lifecycle events, not physical-device backgrounding.
+The final PR workflow verifies the full exported adventure; the latest Actions run is authoritative. Its `kikori-test-reports-chromium` / `kikori-test-reports-webkit` artifacts contains actual screenshots and per-engine JSON. Chromium's full route checks touch start/stop/cancel, PC movement, trunk and unbuilt-bridge collision, UI blocking, input resets, sale, all three upgrade types, partial construction/reload, bridge passage, harvesting and selling amber wood, persistent unlocks, rotation, corrupt saves and denied storage. WebKit checks the initial gameplay and save/UI/error paths. Visibility and blur cancellation include injected browser lifecycle events, not physical-device backgrounding.
 
 ## Bounded rendering
 

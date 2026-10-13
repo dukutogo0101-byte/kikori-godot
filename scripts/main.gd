@@ -23,6 +23,8 @@ var reset_callback: JavaScriptObject
 var purchase_lock_until = 0
 
 func _ready() -> void:
+ _configure_viewport()
+ get_window().size_changed.connect(_configure_viewport)
  native_smoke = "--smoke-test" in OS.get_cmdline_user_args()
  var data = {} if native_smoke else store.read_save()
  var restored = false
@@ -133,3 +135,12 @@ func _exit_tree() -> void:
 func _sound(on: bool) -> void:
  feedback.sound = on
  if on: feedback.event({"type":"pickup"})
+
+func _configure_viewport() -> void:
+ var window_size = get_window().size
+ if window_size.x<=0 or window_size.y<=0: return
+ # Keep phone-sized controls while letting the world fill both orientations.
+ var reference = Vector2i(390,int(round(390.0*window_size.y/window_size.x))) if window_size.y>=window_size.x else Vector2i(int(round(390.0*window_size.x/window_size.y)),390)
+ if get_window().content_scale_size != reference:
+  get_window().content_scale_size = reference
+ controller.reset()

@@ -65,7 +65,7 @@ LIBGL_ALWAYS_SOFTWARE=1 xvfb-run -a python3 tests/browser_smoke.py --engine webk
 
 ブラウザテストはGodotの実Web出力に入力し、Chromeではプロトコルのタッチドラッグ、両エンジンではPC操作とUIタップを試します。Chromeの長いルートは橋を完成させ、新しい木を切って売却し、セーブを再読み込みします。状態を変えるゲーム用APIは用意していません。`window.kikoriState` / `window.kikoriUi` は診断用の読み取り要約です。
 
-Actionsの `kikori-test-reports` にJSONと実際のスクリーンショット、`kikori-web` に遊べる出力を保存します。現時点の結果・テンポ・実機未確認項目は [docs/QA.md](docs/QA.md) に記録します。
+Actionsの `kikori-test-reports-chromium` / `kikori-test-reports-webkit` にJSONと実際のスクリーンショット、`kikori-web` に遊べる出力を保存します。現時点の結果・テンポ・実機未確認項目は [docs/QA.md](docs/QA.md) に記録します。
 
 ## 実装と負荷
 
