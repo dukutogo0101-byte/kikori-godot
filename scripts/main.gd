@@ -24,6 +24,8 @@ var reset_callback: JavaScriptObject
 var purchase_lock_until = 0
 
 func _ready() -> void:
+ print("BOOT_STAGE READY_ENTER")
+ print("BOOT_STAGE _configure_viewport()")
  _configure_viewport()
  get_window().size_changed.connect(_configure_viewport)
  native_smoke = "--smoke-test" in OS.get_cmdline_user_args()
@@ -34,16 +36,20 @@ func _ready() -> void:
   if not restored: store.message = "保存データを復元できません。新しく始めます"
  var font = load("res://assets/fonts/KikoriSans.otf")
  add_child(world)
+ print("BOOT_STAGE world.setup(game,font)")
  world.setup(game,font)
  add_child(ui)
+ print("BOOT_STAGE ui.setup(game,font)")
  ui.setup(game,font)
  ui.save_available = store.available
  add_child(controller)
  controller.blocked = ui.blocked
  add_child(roads)
+ print("BOOT_STAGE roads.setup(game,ui,world)")
  roads.setup(game,ui,world)
  roads.applied.connect(_save)
  ui.logistics_panel.action.connect(_logistics_action)
+ print("BOOT_STAGE add_child(feedback)")
  add_child(feedback)
  ui.upgrade_requested.connect(_buy)
  ui.facility_requested.connect(_buy_facility)
@@ -55,6 +61,7 @@ func _ready() -> void:
  if not store.message.is_empty(): ui.toast(store.message)
  elif restored: ui.toast("おかえりなさい。続きの森へ！")
  else: ui.toast("ドラッグで歩こう。木のそばで止まると伐採")
+ print("BOOT_STAGE if OS.has_feature(web):")
  if OS.has_feature("web"):
   document = JavaScriptBridge.get_interface("document")
   window = JavaScriptBridge.get_interface("window")
@@ -62,7 +69,9 @@ func _ready() -> void:
   reset_callback = JavaScriptBridge.create_callback(_reset_input)
   document.addEventListener("visibilitychange",visibility_callback)
   window.addEventListener("kikori-input-reset",reset_callback)
+ print("BOOT_STAGE _visibility([])")
   _visibility([])
+ print("BOOT_STAGE diagnostics()")
   diagnostics()
  if native_smoke:
   print("KIKORI_ADVENTURE_READY trees=%d objects=%s" % [game.trees.size(),world.counts()])
