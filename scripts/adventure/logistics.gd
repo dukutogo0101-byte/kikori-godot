@@ -4,7 +4,7 @@ const Defs = preload("res://scripts/adventure/definitions.gd")
 const ROAD_PRICE = 2
 const MAX_ROADS = 1200
 const MAX_CARTS = 6
-const DEPOTS = [Vector2(0,13),Vector2(0,-18),Vector2(0,-37)]
+const DEPOTS = [Vector2(0,13),Vector2(0,-66),Vector2(6,-157)]
 const DIRS = [Vector2i.RIGHT,Vector2i.DOWN,Vector2i.LEFT,Vector2i.UP]
 var roads = {}
 var road_paid = 0
@@ -167,7 +167,7 @@ func upgrade_price(cart: Dictionary, level: int = -1) -> int:
 func route_ok(game, source: String, destination: String) -> bool:
  var a=endpoint(game,source);var b=endpoint(game,destination)
  if a.is_empty() or b.is_empty() or source==destination or a.type=="market" or b.type=="camp":
-  message="伐採所・倉庫から、別の倉庫・売り場を選んでください";return false
+  message="伐採所・倉庫から、別の倉庫・中央基地を選んでください";return false
  if path_between(game,cell(a.position),cell(b.position)).is_empty():
   message="出発地と目的地の円の中心まで道路をつなごう";return false
  return true
@@ -328,7 +328,8 @@ func restore_logs(game, list, out: Array, limit: int, ids: Dictionary, total: in
   if not log is Dictionary or not game.number(log.get("id"),1,total,true) or not game.number(log.get("kind"),0,2,true): return false
   var id=int(log.id);var kind=int(log.kind)
   if ids.has(id) or not game.area_open(kind): return false
-  ids[id]=true;out.append({"id":id,"kind":kind})
+  if not game.number(log.get("quality",0),0,2,true): return false
+  ids[id]=true;out.append({"id":id,"kind":kind,"quality":int(log.get("quality",0))})
  return true
 
 func restore(game, data, ids: Dictionary, total: int) -> bool:
@@ -337,7 +338,7 @@ func restore(game, data, ids: Dictionary, total: int) -> bool:
  if data.get("depot_mode")!="deposit" and data.get("depot_mode")!="withdraw": return false
  depot_mode=data.depot_mode;road_paid=int(data.road_paid)
  for pair in data.roads:
-  if not game.pair(pair) or not game.number(pair[0],-20,20,true) or not game.number(pair[1],-46,18,true): return false
+  if not game.pair(pair) or not game.number(pair[0],Defs.WORLD_BOUNDS.position.x,Defs.WORLD_BOUNDS.end.x,true) or not game.number(pair[1],Defs.WORLD_BOUNDS.position.y,Defs.WORLD_BOUNDS.end.y,true): return false
   var p=Vector2i(int(pair[0]),int(pair[1]))
   if roads.has(p) or not road_valid(game,p): return false
   roads[p]=true
@@ -358,7 +359,7 @@ func restore(game, data, ids: Dictionary, total: int) -> bool:
   if not restore_logs(game,raw.get("cargo"),copy.cargo,cart_capacity(copy),ids,total): return false
   if not raw.get("path") is Array or raw.path.size()>MAX_ROADS or not game.number(raw.get("cursor"),0,raw.path.size(),true): return false
   for pair in raw.path:
-   if not game.pair(pair) or not game.number(pair[0],-20,20,true) or not game.number(pair[1],-46,18,true): return false
+   if not game.pair(pair) or not game.number(pair[0],Defs.WORLD_BOUNDS.position.x,Defs.WORLD_BOUNDS.end.x,true) or not game.number(pair[1],Defs.WORLD_BOUNDS.position.y,Defs.WORLD_BOUNDS.end.y,true): return false
    var point=Vector2i(int(pair[0]),int(pair[1]))
    if not roads.has(point): return false
    if not copy.path.is_empty() and not edge_ok(game,copy.path.back(),point): return false

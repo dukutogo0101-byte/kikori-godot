@@ -18,7 +18,7 @@ def verify(browser,url,count):
    page.wait_for_timeout(350)
    data=page.evaluate('({state:window.kikoriState,ui:window.kikoriUi,error:window.kikoriLoadError})')
    assert not errors and not data.get('error'),errors or data
-   assert data['state']['version']==4 and data['state']['conserved'] and data['state']['money']==0,data
+   assert data['state']['version']==5 and data['state']['conserved'] and data['state']['money']==0,data
    assert data['ui']['logistics'] and not data['ui']['modal'],data['ui']
    print('KIKORI_FRESH_BOOT',index+1,'passed',flush=True)
   except Exception:

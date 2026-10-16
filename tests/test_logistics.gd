@@ -24,7 +24,7 @@ func create_logs(game, amount: int, out: Array) -> void:
   var tree=game.trees[0];tree.hp=0;tree.harvested=false;game.fell(0)
   while not game.ground.is_empty():
    var log=game.ground.pop_back()
-   if amount>0: out.append({"id":log.id,"kind":log.kind});amount-=1
+   if amount>0: out.append({"id":log.id,"kind":log.kind,"quality":log.get("quality",0)});amount-=1
    else: game.sell_log(log,Defs.SALE)
   tree.hp=Defs.KINDS[0].hp;tree.regrow=0.0;tree.fall=0.0;tree.harvested=false
 func clone(game):
@@ -47,8 +47,8 @@ func _initialize() -> void:
  var money=game.money
  check(not logistics.edit_roads(game,[Vector2i(0,10),Vector2i(-3,3)]),"Discontinuous or blocked road fails atomically")
  check(game.money==money and logistics.roads.is_empty(),"Failed stroke never charges or partly builds")
- check(not logistics.edit_roads(game,[Vector2i(0,-8)]),"Cannot pave an unfinished bridge")
- check(not logistics.edit_roads(game,[Vector2i(0,-12)]),"Cannot pave locked land")
+ check(not logistics.edit_roads(game,[Vector2i(0,-41)]),"Cannot pave an unfinished bridge")
+ check(not logistics.edit_roads(game,[Vector2i(0,-52)]),"Cannot pave locked land")
  check(not logistics.edit_roads(game,[Vector2i(4,6)]),"Cannot pave through a building")
  check(not logistics.edit_roads(game,[Vector2i(-3,3)]),"Clear a tree before paving")
  roads(game,Vector2i(0,10),Vector2i(0,13))
@@ -112,10 +112,10 @@ func _initialize() -> void:
  var cross=fresh();var consumed=[];create_logs(cross,60,consumed)
  cross.spent[0]+=consumed.size();cross.projects.bridge=60
  check(cross.automation.buy(cross,0,"camp") and cross.logistics.buy_depot(cross,1),"Unlock a regional collection depot")
- roads(cross,Vector2i(-12,9),Vector2i(0,9));roads(cross,Vector2i(0,9),Vector2i(0,-18))
- roads(cross,Vector2i(0,-11),Vector2i(12,-11))
+ roads(cross,Vector2i(-12,9),Vector2i(0,9));roads(cross,Vector2i(0,9),Vector2i(0,-66))
+ roads(cross,Vector2i(0,9),Vector2i(4,9))
  check(cross.logistics.add_cart(cross,"camp0","depot1"),"Route crosses the completed bridge")
- check(cross.logistics.add_cart(cross,"depot1","market2"),"Regional depot forwards incoming goods")
+ check(cross.logistics.add_cart(cross,"depot1","market0"),"Regional depot forwards incoming goods")
  var sold_before=cross.sold[0];advance(cross,240)
  check(cross.sold[0]>sold_before and cross.sold[1]==0,"Wood retains its kind through a different forest and regional market")
  clone(cross)
@@ -134,11 +134,9 @@ func _initialize() -> void:
   var current=JSON.stringify(game.snapshot())
   check(not game.restore(invalid),"Malformed roads, routes, IDs or cash are rejected")
   check(JSON.stringify(game.snapshot())==current,"Failed logistics restore is atomic")
- # v3 and v2 saves still restore without roads or charges.
- var legacy=fresh().snapshot();legacy.version=3;legacy.erase("logistics")
- var migrated=State.new()
- check(migrated.restore(JSON.parse_string(JSON.stringify(legacy))),"Existing v3 money and trees migrate")
- check(migrated.money==legacy.money and migrated.logistics.roads.is_empty(),"No migration fees, inventory reset or surprise routes")
+ # No compatibility guess can silently turn a previous map into new terrain.
+ var legacy=fresh().snapshot();legacy.version=4
+ check(not State.new().restore(legacy),"Previous world format is rejected safely")
  # Paving a cleared tree prevents a later respawn from blocking the route.
  game=fresh();var tree=game.trees[0];tree.hp=0;tree.harvested=false;game.fell(0)
  while not game.ground.is_empty(): game.sell_log(game.ground.pop_back(),Defs.SALE)

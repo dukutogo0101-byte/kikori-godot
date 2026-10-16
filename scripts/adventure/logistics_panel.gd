@@ -37,7 +37,7 @@ func setup(state, owner_ui) -> void:
  close_button=ui.button("閉じる");close_button.pressed.connect(func():close_requested.emit());header.add_child(close_button)
  var scroll=ScrollContainer.new();scroll.horizontal_scroll_mode=ScrollContainer.SCROLL_MODE_DISABLED;scroll.size_flags_vertical=Control.SIZE_EXPAND_FILL;layout.add_child(scroll)
  var body=VBoxContainer.new();body.size_flags_horizontal=Control.SIZE_EXPAND_FILL;body.add_theme_constant_override("separation",10);scroll.add_child(body)
- var help=ui.text("道の中心をつなぐと荷車が往復。伐採所 → 集積倉庫 → 売り場と、複数のルートを組めます。",14);help.autowrap_mode=TextServer.AUTOWRAP_WORD_SMART;body.add_child(help)
+ var help=ui.text("道の中心をつなぐと荷車が往復。伐採所 → 集積倉庫 → 中央基地と、複数のルートを組めます。倉庫では入金されません。",14);help.autowrap_mode=TextServer.AUTOWRAP_WORD_SMART;body.add_child(help)
  var road=ui.button("道路を作る・撤去する");road.pressed.connect(func():action.emit("editor",null));body.add_child(road)
  var tabs=HBoxContainer.new();body.add_child(tabs)
  for i in 3:
@@ -64,11 +64,11 @@ func setup(state, owner_ui) -> void:
   var apply=ui.button("選択中のルートに変更");apply.pressed.connect(func():action.emit("route",[i,source_id,destination_id]));col.add_child(apply)
   var clear=ui.button("ルートを解除");clear.pressed.connect(func():action.emit("clear",i));col.add_child(clear)
   routes.append({"panel":panel,"label":label,"pause":pause,"upgrade":upgrade,"route":apply,"clear":clear})
- var note=ui.text("道路は1マス2、撤去時の払い戻しはありません。配送中の道は撤去できません。休止は荷物を届けてから。既存の運搬係は直接売却を続けます。",13);note.autowrap_mode=TextServer.AUTOWRAP_WORD_SMART;body.add_child(note)
+ var note=ui.text("道路は1マス2、撤去時の払い戻しはありません。配送中の道は撤去できません。休止は荷物を届けてから。運搬係も橋を渡って中央基地まで往復します。",13);note.autowrap_mode=TextServer.AUTOWRAP_WORD_SMART;body.add_child(note)
  refresh()
 
 func Defs_name(index: int) -> String:
- return ["雪松","琥珀","銀"][index]
+ return ["雪松","琥珀","白樺"][index]
 
 func refresh() -> void:
  var logistics=game.logistics

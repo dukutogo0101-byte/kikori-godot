@@ -19,7 +19,7 @@ from http.server import SimpleHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 from playwright.sync_api import sync_playwright
 
-KEY = 'kikori.adventure.v2'
+KEY = 'kikori.watersheds.v5'
 
 
 def capture(page, name):
@@ -86,7 +86,7 @@ def move(page, x, z):
     start = time.monotonic()
     held = set()
     try:
-        while time.monotonic() - start < 45:
+        while time.monotonic() - start < 100:
             p = state(page)['position']
             dx, dz = x - p[0], z - p[1]
             if abs(dx) < .28 and abs(dz) < .28:
@@ -168,7 +168,7 @@ def fill(page, kind):
 
 def sell(page):
     before = state(page)
-    expected = sum([10, 24, 50][log['kind']] for log in before['bag'])
+    expected = sum([10,24,50][log['kind']] * (1+log.get('quality',0)) for log in before['bag'])
     path(page, 4, 9)
     page.wait_for_function('window.kikoriState.bag.length === 0', timeout=10000)
     after = state(page)
@@ -217,6 +217,7 @@ def inspect(browser, url, engine, full):
     context = browser.new_context(viewport={'width': 390, 'height': 844}, is_mobile=True,
                                   has_touch=True, locale='ja-JP')
     context.add_init_script("try{localStorage.setItem('kikori.phase1.v1', JSON.stringify({money:1000000000}));}catch(e){}")
+    context.add_init_script("localStorage.setItem('kikori.adventure.v2', JSON.stringify({version:4,old_world_marker:'preserve'}));")
     page = context.new_page()
     page.bring_to_front()
     errors = []
@@ -229,6 +230,10 @@ def inspect(browser, url, engine, full):
         load_seconds = time.monotonic() - started
         assert state(page)['money'] == 0, 'Old idle-game wealth must not skip the new beginning'
         first_frame = capture(page, engine + '-start')
+        tap(page,'map')
+        assert page.evaluate('window.kikoriUi.map_open')
+        capture(page,engine+'-watershed-map')
+        tap(page,'map_close')
         if engine == 'chromium':
             touch_checks(page, context)
         # Tapping UI and opening a modal must never create movement.
@@ -306,15 +311,15 @@ def inspect(browser, url, engine, full):
             fill(page, 0); sell(page); buy(page, 'axe')
             fill(page, 0); sell(page); buy(page, 'boots')
             # The bridge physically blocks the route before its completion.
-            path(page, 0, -6.5)
+            path(page, 0, -37.0)
             page.keyboard.down('w'); page.wait_for_timeout(900); page.keyboard.up('w')
             page.wait_for_timeout(160)
-            assert state(page)['position'][1] > -6.8
+            assert state(page)['position'][1] > -37.8
             capture(page, engine + '-bridge-before')
             fill(page, 0)
-            path(page, 0, -5.1)
+            path(page, 0, -35.5)
             page.wait_for_function('window.kikoriState.projects.bridge >= 3', timeout=5000)
-            move(page, 0, -3.1)
+            move(page, 0, -33.1)
             page.wait_for_timeout(3200)
             partial = state(page)['projects']['bridge']
             assert 0 < partial < 60
@@ -324,12 +329,12 @@ def inspect(browser, url, engine, full):
                 if state(page)['projects']['bridge'] == 60:
                     break
                 fill(page, 0)
-                path(page, 0, -5.1)
+                path(page, 0, -35.5)
                 page.wait_for_function('window.kikoriState.bag.length === 0 || window.kikoriState.projects.bridge === 60', timeout=10000)
                 assert state(page)['conserved']
             assert state(page)['projects']['bridge'] == 60
             capture(page, engine + '-bridge-open')
-            path(page, 0, -12.8)
+            path(page, 0, -53.0)
             harvest(page, 1)
             assert any(log['kind'] == 1 for log in state(page)['bag'])
             capture(page, engine + '-amber-forest')
@@ -337,6 +342,7 @@ def inspect(browser, url, engine, full):
             page.reload(); ready(page)
             assert state(page)['projects']['bridge'] == 60
             assert state(page)['levels'] == {'axe': 1, 'pack': 1, 'boots': 1}
+        assert page.evaluate("JSON.parse(localStorage.getItem('kikori.adventure.v2')).old_world_marker") == 'preserve'
         final = state(page)
         # Wide controls must remain usable; resizing cannot leave a held input.
         page.keyboard.down('s')

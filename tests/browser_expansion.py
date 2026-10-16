@@ -36,10 +36,15 @@ def run(browser,url):
     page.on('console',lambda e: errors.append(e.text) if e.type=='error' else None)
     page.goto(url);ready(page)
     page.wait_for_timeout(600)
-    assert len(state(page)['layout'])==69
-    assert len(state(page)['markets'])==4
+    assert len(state(page)['layout'])>200
+    assert len(state(page)['markets'])==1
     assert state(page)['render']['camera_size']>=27.9
     snap(page,'wide-start')
+    tap(page,'map')
+    assert page.evaluate('window.kikoriUi.map_open')
+    snap(page,'watershed-map')
+    tap(page,'map_close')
+    assert not page.evaluate('window.kikoriUi.modal')
     start=state(page)['position']
     tap(page,'view')
     page.wait_for_function('window.kikoriState.wide_view && window.kikoriState.render.camera_size > 35')
@@ -89,7 +94,7 @@ def run(browser,url):
     tap(page,'close')
     assert not page.evaluate('window.kikoriUi.modal')
     assert not errors,errors
-    result={'actual_web_export':True,'fixture':'validated earned revenue for equipment scenario','markets':4,'trees':69,'purchases':state(page)['automation']['levels'][0],'conserved':state(page)['conserved'],'errors':errors,'software_fps':state(page)['fps']}
+    result={'actual_web_export':True,'fixture':'validated earned revenue for equipment scenario','markets':1,'trees':len(state(page)['layout']),'purchases':state(page)['automation']['levels'][0],'conserved':state(page)['conserved'],'errors':errors,'software_fps':state(page)['fps']}
     Path('reports/expansion-browser-results.json').write_text(json.dumps(result,indent=2))
     print('KIKORI_EXPANSION_BROWSER',json.dumps(result),flush=True)
     context.close()
