@@ -2,7 +2,7 @@
 
 ## Verification scope
 
-Main contains the direct-control adventure from PR #1. This expansion is on `feature/expanded-forests-automation`; no main update, merge or deployment is part of this change.
+Main contains the direct-control adventure and expanded forests from PRs #1–#2. The roads and logistics expansion is validated below before publication.
 
 This expansion was built locally with the pinned official Godot 4.5.2 and single-thread Web templates. Chromium Playwright 1.56 ran the actual Web export over a local HTTP server using software rendering. Local WebKit lacks native dependencies; CI retains the WebKit probe and browser checks. Physical Android/iPhone performance is unmeasured.
 
@@ -10,7 +10,7 @@ This expansion was built locally with the pinned official Godot 4.5.2 and single
 
 - Direct movement → chop → collect → sell: 5 checks passed.
 - Adventure suite: 144 checks passed, including a complete physical route with three upgrades, both bridges, workshop and all three resource species.
-- Scene suite: 77 checks passed, including UI input exclusion, touch cancel/release, leaving the viewport, PC input reset, menu pause, and one hour of cosmetic updates with fixed pools.
+- Scene suite: 83 checks passed, including UI input exclusion, touch cancel/release, leaving the viewport, PC input reset, menu pause, and one hour of cosmetic updates with fixed pools.
 - Web framebuffer guard test passed; Python tooling compiles.
 - Save restore validates IDs, counts, harvest cycles, prices, construction contributions and money before committing state. Unsupported schemas and corrupt state are rejected without partial changes.
 
@@ -64,3 +64,13 @@ The expanded scene starts with 275 direct children, including fixed pools of 24 
 | 30fps+ and stable memory on recent mid-range phone | Pending | Pending |
 
 The game is optimized toward 30fps, but no physical-device frame rate, memory or thermal claim has been made. WebKitGTK tests the Safari-family engine; it is not iOS Safari certification. Storage may be cleared by private browsing, device cleanup or user action; unavailable storage leaves a playable in-tab session with a visible indicator.
+
+
+## Roads and logistics
+
+- Native logistics suite: 176 checks, including atomic road purchases, disconnected/locked terrain, occupied-road removal, two-stage delivery, cross-bridge transport preserving resource species, cargo reservation across competing carts and player deposits, exact transit save/resume, pause and route changes, old v3 migration, corrupt saves and one simulated hour with six carts.
+- Scene tests exercise real screen touch/drag, preview without spending, cancel and editor exclusion of hero movement. A short landscape/square viewport exposed a toolbar overlap; editing controls now share the camera-button row.
+- Browser coverage uses a native-validated earned-revenue fixture, purchases and configures two carts through the actual menu, waits for their sale, pauses after delivery, constructs roads with protocol touch input and explicit confirmation, cancels touch, rotates, and reloads. The fixture does not claim those setup funds were earned in-browser.
+- Endpoint lists are rebuilt only when available facilities change; continuous refresh must not reset a keyboard or touch selection in an open picker.
+- v4 validation accounts for all depot/cargo resource IDs, road and cart purchase costs, route geometry, depot capacity reservations and precise cart positions before committing a restored state. Existing storage key is preserved.
+- Carts can share roads and pass each other; traffic simulation and signals are outside this version. The existing porter remains a direct-sale option.

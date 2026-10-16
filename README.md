@@ -2,7 +2,7 @@
 
 雪の森で主人公を動かし、自分で切る・背負う・運ぶ・橋を建てる3D木こりゲーム。Godot 4.5.2 Compatibility / WebGL 2、スマホ縦画面と片手操作が中心です。
 
-拡張版は作業ブランチ `feature/expanded-forests-automation` で検証します。mainへのマージ・公開はこの変更に含めません。PRのActionsから `kikori-web` をダウンロードし、下記のHTTPサーバーで試せます。
+公開版: https://dukutogo0101-byte.github.io/kikori-godot/ 。PRのActionsから `kikori-web` をダウンロードして、下記のHTTPサーバーでも試せます。
 
 ## 広い森と自動化
 
@@ -21,7 +21,25 @@
 
 次の森の設備は基本価格×1.45、銀の森は×1.45²。設備強化は前段階価格の約2.1倍です。運搬係と製材設備は伐採所が前提。設備はゲームを遊んでいる間に稼働し、メニュー・非表示・留守中は進みません。倉庫が満ちると伐採を待ち、木材を消しません。
 
-既存のv2セーブは資金・荷物・強化・建設・木の状態を保ってv3へ移行します。保存キーは同じです。
+既存のv2／v3セーブは資金・荷物・強化・建設・木・自動化設備を保ってv4へ移行します。保存キーは同じです。
+
+## 道路と物流
+
+左上の「道路・物流」から道路編集、集積倉庫、荷車の運行を設定できます。
+
+1. 伐採所を購入し、必要なら集積倉庫を建設します。出発地を選び「出発地を地図で見る・道を敷く」を押すと、施設の中心から道路を描けます。
+2. 「敷設」で地面をドラッグし、表示された金額を確認して確定します。「移動」で地図をずらせます。施設の円の中心まで、上下左右につながる道が必要です。生きた木は先に切り、橋の先へは橋を完成させてから敷きます。
+3. 完了して物流画面へ戻り、出発地と目的地を選んで荷車を購入します。伐採所→売り場への直送、伐採所→集積倉庫→売り場の中継、橋を渡る配送に対応します。木の種類と売値は配送先で変わりません。
+
+| 設備 | 価格・上限 | 効果 |
+|---|---|---|
+| 道路 | 1マス2、最大1,200マス | 荷車の走行路。主人公も15%速く歩けます |
+| 集積倉庫 | 最初の森160、強化288／518 | 容量48→80→112本。森別の価格倍率は既存設備と同じ |
+| 荷車 | 120、最大6台 | 積載8本。強化90／180で12→16本、速度も上昇 |
+
+集積倉庫の円で止まると荷物を預けます。物流画面で「取り出す」に切り替えると回収でき、建設にも使えます。配送中の荷物は到着前に倉庫の空きを予約し、満杯なら出発地で待ちます。既存の運搬係は直接売却を続けます。
+
+「休止」は荷物を届けてから停止します。空荷で停止中にルートを変更・解除できます。使用中の道路は撤去できず、撤去の払い戻しはありません。道路上では木の再生を待ちます。編集・メニュー・非表示の間はゲーム時間を停止し、未確定の道路は保存しません。確定した道・倉庫・荷物・配送中の位置を一緒に保存します。
 
 ## 遊び方
 
@@ -72,11 +90,15 @@ python3 -m http.server 8000 --directory build/web
 ```bash
 godot --headless --path . --script tests/test_direct_loop.gd
 godot --headless --path . --script tests/test_adventure.gd
+godot --headless --path . --script tests/test_automation.gd
+godot --headless --path . --script tests/test_logistics.gd
 godot --headless --path . --script tests/test_scene.gd -- --smoke-test
 node tests/test_web_guard.cjs
 pip install playwright==1.56.0
 python3 -m playwright install --with-deps chromium webkit
 python3 tests/browser_smoke.py --engine chromium --full
+python3 tests/browser_expansion.py
+python3 tests/browser_logistics.py
 LIBGL_ALWAYS_SOFTWARE=1 xvfb-run -a python3 tests/browser_smoke.py --engine webkit
 ```
 
@@ -94,6 +116,8 @@ Actionsの `kikori-test-reports-chromium` / `kikori-test-reports-webkit` にJSON
 | `scripts/adventure/definitions.gd` | エリア、木、建設、価格などのデータ |
 | `scripts/adventure/game_state.gd` | 60Hzの移動・衝突、資源、経済、建設、厳密な保存検証 |
 | `scripts/adventure/automation.gd` | 森別設備・作業員の移動・共有資源・倉庫と保存 |
+| `scripts/adventure/logistics.gd` | 道路経路、倉庫予約、荷車運行と保存検証 |
+| `scripts/adventure/road_editor.gd` / `logistics_panel.gd` / `logistics_view.gd` | 道路編集、物流設定、道路と荷車の表示 |
 | `scripts/adventure/player_controller.gd` | タッチ／マウス／キー、入力解除 |
 | `scripts/adventure/world_view.gd` | 固定カメラ追従、歩行・伐採・荷物・完成演出 |
 | `scripts/adventure/game_ui.gd` / `stick_view.gd` | 小型HUD、強化、目標誘導、スティック |
@@ -111,6 +135,6 @@ Webはシングルスレッドで、SharedArrayBuffer／COOP／COEPは不要。W
 
 ## CIと公開の境界
 
-PRはビルド・テスト・成果物だけを作ります。`deploy` と `verify-live` はmain以外で実行しません。この依頼ではmainへの直接push、マージ、公開デプロイを行いません。将来マージが承認された場合は、既存mainのActions／Pages自動公開が働く構成です。
+PRはビルド・テスト・成果物だけを作ります。`deploy` と `verify-live` はmain以外で実行しません。mainへのマージ後、ビルドと両ブラウザのテストが成功するとPagesへ公開し、公開URLも検証します。
 
 有料サービス、APIキー、サーバー、DBは不要。外部作品の素材は使いません。コードと独自素材はMIT、日本語フォントはSIL OFL 1.1。[ASSET_LICENSES.md](ASSET_LICENSES.md) を参照してください。
