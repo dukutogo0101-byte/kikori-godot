@@ -6,6 +6,8 @@ signal view_changed
 signal menu_changed(open: bool)
 signal sound_changed(on: bool)
 signal vibration_changed(on: bool)
+var logistics_button: Button
+var logistics_panel
 var root: Control
 var money_label: Label
 var bag_label: Label
@@ -99,6 +101,10 @@ func setup(state, ui_font: Font) -> void:
  view_button.add_theme_font_size_override("font_size",13)
  view_button.pressed.connect(func(): view_changed.emit())
  root.add_child(view_button)
+ logistics_button=button("道路・物流")
+ logistics_button.add_theme_font_size_override("font_size",14)
+ logistics_button.pressed.connect(func():show_logistics(not logistics_panel.visible))
+ root.add_child(logistics_button)
  goal_label = text("",15)
  goal_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
  root.add_child(goal_label)
@@ -205,6 +211,11 @@ func setup(state, ui_font: Font) -> void:
  vibration_button.pressed.connect(func(): vibration_on = not vibration_on; vibration_button.text = "振動 ON" if vibration_on else "振動 OFF"; vibration_changed.emit(vibration_on))
  options.add_child(vibration_button)
  content.add_child(text("PCはWASD / 矢印キー。木のそばで止まろう",12,Color("678698")))
+ logistics_panel=preload("res://scripts/adventure/logistics_panel.gd").new()
+ root.add_child(logistics_panel)
+ logistics_panel.setup(game,self)
+ logistics_panel.visible=false
+ logistics_panel.close_requested.connect(func():show_logistics(false))
  get_viewport().size_changed.connect(resize)
  resize()
 
@@ -220,6 +231,8 @@ func resize() -> void:
  bag_label.position = Vector2(left+125,49)
  menu_button.position = Vector2(left+width-106,30)
  menu_button.size = Vector2(94,48)
+ logistics_button.position=Vector2(left,132)
+ logistics_button.size=Vector2(112,44)
  view_button.position=Vector2(left+width-100,132)
  view_button.size=Vector2(100,44)
  goal_label.position = Vector2(left+16,86)
@@ -233,16 +246,29 @@ func resize() -> void:
  modal.position = Vector2((size.x-modal.size.x)/2,maxf(8,(size.y-modal.size.y)/2))
  root.get_node("Brand").position = Vector2(left+16,22)
  stick.size = size
+ if logistics_panel!=null:
+  logistics_panel.size=Vector2(minf(size.x-28,390),minf(size.y-24,720))
+  logistics_panel.position=(size-logistics_panel.size)/2
 
 func show_menu(open: bool) -> void:
  modal_open = open
+ if logistics_panel!=null: logistics_panel.visible=false
  modal.visible = open
  root.get_node("Shade").visible = open
  menu_changed.emit(open)
  resize()
 
+func show_logistics(open: bool) -> void:
+ modal.visible=false
+ logistics_panel.visible=open
+ modal_open=open
+ root.get_node("Shade").visible=open
+ if open: logistics_panel.refresh()
+ menu_changed.emit(open)
+ resize()
+
 func blocked(at: Vector2) -> bool:
- return modal_open or root.get_node("Top").get_global_rect().has_point(at) or view_button.get_global_rect().has_point(at)
+ return modal_open or root.get_node("Top").get_global_rect().has_point(at) or view_button.get_global_rect().has_point(at) or logistics_button.get_global_rect().has_point(at)
 
 func toast(value: String) -> void:
  toast_text = value
@@ -270,6 +296,9 @@ func update(delta: float, controller, camera: Camera3D) -> void:
  for area in 3:
   if game.automation.levels[area].camp>0 and game.position.distance_to(Defs.CAMPS[area])<1.3:
    hint="倉庫 · 止まると木材を取り出す（建設にも使える）"
+ for area in 3:
+  if game.logistics.depot_levels[area]>0 and game.position.distance_to(game.Logistics.DEPOTS[area])<1.3:
+   hint="集積倉庫 · "+("預ける" if game.logistics.depot_mode=="deposit" else "取り出す")+"（道路・物流で切替）"
  hint_label.text = toast_text if toast_time>0 else hint
  view_button.text="視野：最大" if game.wide_view else "視野：広い"
  for area in 3:
@@ -294,6 +323,7 @@ func update(delta: float, controller, camera: Camera3D) -> void:
  stick.origin = controller.origin
  stick.pointer = controller.pointer
  stick.queue_redraw()
+ if logistics_panel.visible: logistics_panel.refresh()
  var p = game.goal().position
  var projected = camera.unproject_position(Vector3(p.x,0.4,p.y))
  var size = get_viewport().get_visible_rect().size
@@ -306,11 +336,14 @@ func update(delta: float, controller, camera: Camera3D) -> void:
 
 func summary() -> Dictionary:
  var result = {"width":get_viewport().get_visible_rect().size.x,"height":get_viewport().get_visible_rect().size.y,"modal":modal_open}
- var nodes = {"menu":menu_button,"close":close_button,"sound":sound_button,"vibration":vibration_button,"view":view_button}
+ var nodes = {"menu":menu_button,"close":close_button,"sound":sound_button,"vibration":vibration_button,"view":view_button,"logistics":logistics_button}
  for key in rows: nodes[key] = rows[key].button
  for key in facility_rows: nodes[key]=facility_rows[key].button
  for area in 3: nodes["area%d" % area]=area_buttons[area]
  for key in nodes:
   var center = nodes[key].get_global_rect().get_center()
   result[key] = {"x":center.x,"y":center.y}
+ if logistics_panel!=null:
+  result.merge(logistics_panel.summary())
+  result["logistics_open"]=logistics_panel.visible
  return result

@@ -2,6 +2,12 @@ extends Node3D
 const Defs = preload("res://scripts/adventure/definitions.gd")
 const Art = preload("res://scripts/art.gd")
 var game
+var planning=false
+var show_routes=false
+var planning_focus=Vector3.ZERO
+var road_preview: Array = []
+var road_preview_remove=false
+var logistics_view
 var art = Art.new()
 var hero: Node3D
 var body: MeshInstance3D
@@ -212,6 +218,9 @@ func setup(state, ui_font: Font) -> void:
  add_child(camera)
  camera.position = hero.position+Vector3(0,18,16)
  camera.look_at(hero.position+Vector3(0,0.6,0))
+ logistics_view=preload("res://scripts/adventure/logistics_view.gd").new()
+ add_child(logistics_view)
+ logistics_view.setup(game,self)
  last_projects = game.projects.duplicate()
  update(0)
 
@@ -303,6 +312,7 @@ func update(delta: float) -> void:
   var p = Defs.PROJECTS[i]
   labels[i].text = "%s\n%d / %d 本" % [p.name,game.projects[p.id],p.need] if not game.complete(p.id) else "開通！" if p.id != "workshop" else "工房 完成"
  update_automation(delta)
+ logistics_view.update(delta)
  var counts = [0,0,0]
  for log in game.ground:
   var transform = Transform3D(Basis(Vector3.UP,float(log.id)*1.7),Vector3(log.position.x,0.18,log.position.y))
@@ -361,8 +371,10 @@ func update(delta: float) -> void:
    chip.node.visible=false
  # Follow without rotating the screen's movement axes.
  var camera_size = (38.0 if game.wide_view else 28.0) if get_viewport().get_visible_rect().size.x < get_viewport().get_visible_rect().size.y else (24.0 if game.wide_view else 18.0)
+ if planning: camera_size=42.0 if get_viewport().get_visible_rect().size.x<get_viewport().get_visible_rect().size.y else 24.0
  camera.size = lerpf(camera.size,camera_size,1-exp(-3*delta)) if delta>0 else camera_size
- camera_anchor = camera_anchor.lerp(hero.position,1-exp(-7*delta)) if delta>0 else hero.position
+ var follow=planning_focus if planning else hero.position
+ camera_anchor = camera_anchor.lerp(follow,1-exp(-7*delta)) if delta>0 else follow
  camera.position = camera_anchor+Vector3(0,18,16)
  camera.look_at(camera_anchor+Vector3(0,0.6,0))
 

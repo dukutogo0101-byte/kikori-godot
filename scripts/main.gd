@@ -6,6 +6,7 @@ const World = preload("res://scripts/adventure/world_view.gd")
 const UI = preload("res://scripts/adventure/game_ui.gd")
 const Feedback = preload("res://scripts/adventure/feedback.gd")
 const Store = preload("res://scripts/save_store.gd")
+var roads=preload("res://scripts/adventure/road_editor.gd").new()
 var game = State.new()
 var controller = Controller.new()
 var world = World.new()
@@ -39,11 +40,15 @@ func _ready() -> void:
  ui.save_available = store.available
  add_child(controller)
  controller.blocked = ui.blocked
+ add_child(roads)
+ roads.setup(game,ui,world)
+ roads.applied.connect(_save)
+ ui.logistics_panel.action.connect(_logistics_action)
  add_child(feedback)
  ui.upgrade_requested.connect(_buy)
  ui.facility_requested.connect(_buy_facility)
  ui.view_changed.connect(func(): game.wide_view=not game.wide_view; controller.reset(); _save())
- ui.menu_changed.connect(func(open): controller.reset(); controller.enabled = not open and not paused; game.velocity = Vector2.ZERO)
+ ui.menu_changed.connect(func(open): controller.reset(); controller.enabled = not open and not paused and not roads.editing; game.velocity = Vector2.ZERO)
  ui.sound_changed.connect(_sound)
  ui.vibration_changed.connect(func(on): feedback.vibration = on)
  get_viewport().size_changed.connect(controller.reset)
@@ -65,7 +70,7 @@ func _ready() -> void:
 
 func _physics_process(delta: float) -> void:
  if world.hero == null: return
- if not paused and not ui.modal_open:
+ if not paused and not ui.modal_open and not roads.editing:
   game.tick(delta,controller.sample())
   for event in game.events:
    world.handle(event)
@@ -79,8 +84,10 @@ func _physics_process(delta: float) -> void:
 
 func _process(delta: float) -> void:
  if world.hero == null: return
+ world.show_routes=ui.logistics_panel.visible
  world.update(minf(delta,0.1))
  ui.update(minf(delta,0.1),controller,world.camera)
+ roads.update()
  diagnostic_clock += delta
  if diagnostic_clock>=0.1:
   diagnostic_clock=0
@@ -103,6 +110,30 @@ func _buy_facility(area: int, key: String) -> void:
   ui.toast(game.notice)
   _save()
 
+func ui_summary() -> Dictionary:
+ var result=ui.summary();result.merge(roads.summary());return result
+
+func _logistics_action(kind: String, value) -> void:
+ if kind=="editor" or kind=="focus":
+  var place=game.logistics.endpoint(game,str(value)) if kind=="focus" else {}
+  var at=place.get("position",game.position+Vector2(-4,0))
+  roads.start(at);world.update(0);return
+ if Time.get_ticks_msec()<purchase_lock_until: return
+ var ok=false
+ match kind:
+  "depot": ok=game.logistics.buy_depot(game,int(value))
+  "mode": game.logistics.depot_mode="withdraw" if game.logistics.depot_mode=="deposit" else "deposit";game.logistics.message="集積倉庫の受け渡し方法を切り替えました";ok=true
+  "cart": ok=game.logistics.add_cart(game,value[0],value[1])
+  "pause": ok=game.logistics.toggle_pause(int(value))
+  "clear": ok=game.logistics.clear_route(int(value))
+  "route": ok=game.logistics.set_route(game,int(value[0]),value[1],value[2])
+  "upgrade_cart": ok=game.logistics.upgrade_cart(game,int(value))
+ if ok:
+  purchase_lock_until=Time.get_ticks_msec()+250
+  _save()
+ ui.toast(game.logistics.message)
+ ui.logistics_panel.refresh()
+
 func _save() -> void:
  save_clock=0
  if native_smoke or ui.root == null: return
@@ -113,19 +144,22 @@ func _save() -> void:
 func _visibility(_args: Array) -> void:
  var hidden = bool(document.hidden)
  controller.reset()
+ roads.reset()
  game.velocity = Vector2.ZERO
  if hidden: _save()
  paused = hidden
- controller.enabled = not hidden and not ui.modal_open
+ controller.enabled = not hidden and not ui.modal_open and not roads.editing
  # No offline actions: the hero acts only while the player is here.
 
 func _reset_input(_args: Array) -> void:
  controller.reset()
+ roads.reset()
  game.velocity = Vector2.ZERO
 
 func _notification(what: int) -> void:
  if what == NOTIFICATION_APPLICATION_FOCUS_OUT or what == NOTIFICATION_WM_CLOSE_REQUEST:
   controller.reset()
+  roads.reset()
   game.velocity=Vector2.ZERO
   if ui.root != null: _save()
 
@@ -137,7 +171,7 @@ func diagnostics() -> void:
  state["fps"] = Engine.get_frames_per_second()
  state["objects"] = world.counts()
  state["render"] = {"frames_drawn":Engine.get_frames_drawn(),"process_frames":Engine.get_process_frames(),"hero":[world.hero.position.x,world.hero.position.z],"money_text":ui.money_label.text,"camera_size":world.camera.size}
- JavaScriptBridge.eval("window.kikoriReady=true;window.kikoriState="+JSON.stringify(state)+";window.kikoriUi="+JSON.stringify(ui.summary())+";",true)
+ JavaScriptBridge.eval("window.kikoriReady=true;window.kikoriState="+JSON.stringify(state)+";window.kikoriUi="+JSON.stringify(ui_summary())+";",true)
 
 func _exit_tree() -> void:
  if document != null and visibility_callback != null: document.removeEventListener("visibilitychange",visibility_callback)

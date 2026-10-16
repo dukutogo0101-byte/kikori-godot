@@ -109,7 +109,11 @@
   window.addEventListener('orientationchange', resetInput);
   canvas.addEventListener('pointercancel', resetInput);
   canvas.addEventListener('touchcancel', resetInput);
-  canvas.addEventListener('pointerleave', resetInput);
+  // Touch pointers leave after a normal release, too. Keep the completed road
+  // preview; touchend stops movement and touchcancel handles interruptions.
+  canvas.addEventListener('pointerleave', function (event) {
+    if (event.pointerType !== 'touch') resetInput();
+  });
 </script>
 </body>
 </html>

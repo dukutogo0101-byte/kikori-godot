@@ -54,6 +54,23 @@ func run() -> void:
  check(root.get_visible_rect().size.x>root.get_visible_rect().size.y,"Landscape viewport expands")
  root.size=old_size
  await process_frame
+ # Real screen events preview a road, require confirmation and never move the hero.
+ ui.show_logistics(true)
+ check(ui.modal_open and ui.logistics_panel.visible,"Logistics menu blocks game controls")
+ ui.show_logistics(false)
+ var at=scene.game.position
+ scene.roads.start(Vector2(-12,9));scene.world.update(0)
+ check(not c.enabled,"Road editing disables the movement controller")
+ var start=scene.world.camera.unproject_position(Vector3(-12,0,9))
+ var end=scene.world.camera.unproject_position(Vector3(-12,0,12))
+ var road_touch=InputEventScreenTouch.new();road_touch.index=3;road_touch.pressed=true;road_touch.position=start
+ scene.roads._input(road_touch)
+ var road_drag=InputEventScreenDrag.new();road_drag.index=3;road_drag.position=end;scene.roads._input(road_drag)
+ road_touch.pressed=false;road_touch.position=end;scene.roads._input(road_touch)
+ check(scene.roads.preview.size()>=3 and scene.game.logistics.roads.is_empty(),"A road stroke is only a preview until confirmed")
+ check(scene.game.position==at,"Drawing roads never moves the hero")
+ scene.roads.reset();check(scene.roads.preview.is_empty(),"Canceling input discards an unconfirmed road")
+ scene.roads.finish();check(c.enabled,"Leaving the editor restores movement")
  var count=scene.world.counts().nodes
  # Many presentation events stress the fixed pools; logical resources are untouched.
  for i in 36000:

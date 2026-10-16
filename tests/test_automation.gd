@@ -93,7 +93,7 @@ func _initialize() -> void:
  var migrated=State.new()
  check(migrated.restore(json_copy(legacy)),"Progressed v2 save migrates")
  check(migrated.money==legacy.money and migrated.trees.size()>legacy.trees.size() and migrated.automation.levels[0].camp==0,"Legacy money and tree IDs survive with fresh outer groves")
- check(migrated.snapshot().version==3,"Next save writes current version")
+ check(migrated.snapshot().version==4,"Next save writes current version")
  roundtrip(migrated)
  # All regional markets accept manual sales with the same price and IDs.
  var regional=State.new()
