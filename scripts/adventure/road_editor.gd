@@ -1,4 +1,5 @@
 extends Node
+const Defs=preload("res://scripts/adventure/definitions.gd")
 signal applied
 var game
 var ui
@@ -34,7 +35,7 @@ func resize() -> void:
  confirm.size=Vector2(toolbar.size.x,48)
 
 func start(at: Vector2) -> void:
- reset();editing=true;mode="build";world.planning=true;world.planning_focus=Vector3(at.x,0,at.y)
+ reset();editing=true;mode="build";world.planning=true;world.planning_focus=Defs.point(at)
  ui.show_menu(false);ui.show_logistics(false);ui.modal_open=false
  ui.menu_changed.emit(false);update()
 
@@ -50,7 +51,27 @@ func blocked(at: Vector2) -> bool:
  return ui.blocked(at) or toolbar.get_global_rect().has_point(at) or (confirm.visible and confirm.get_global_rect().has_point(at)) or ui.root.get_node("Hint").get_global_rect().has_point(at)
 
 func ground(at: Vector2):
- return Plane(Vector3.UP,0).intersects_ray(world.camera.project_ray_origin(at),world.camera.project_ray_normal(at))
+ var origin=world.camera.project_ray_origin(at)
+ var direction=world.camera.project_ray_normal(at)
+ if absf(direction.y)<0.001: return null
+ # Bracket the first heightfield hit so steep lake banks cannot send the
+ # pointer iteration to the opposite bank. Terrain elevations lie in [-2,8].
+ var start=(8.0-origin.y)/direction.y
+ var end=(-2.0-origin.y)/direction.y
+ var previous=start
+ for step in range(1,65):
+  var distance=lerpf(start,end,float(step)/64)
+  var p=origin+direction*distance
+  if p.y<=Defs.height_at(Vector2(p.x,p.z)):
+   var low=previous;var high=distance
+   for i in 18:
+    var mid=(low+high)*0.5
+    var hit=origin+direction*mid
+    if hit.y>Defs.height_at(Vector2(hit.x,hit.z)): low=mid
+    else: high=mid
+   return origin+direction*((low+high)*0.5)
+  previous=distance
+ return null
 
 func append_point(at: Vector2) -> void:
  var hit=ground(at)
@@ -88,8 +109,9 @@ func _input(event: InputEvent) -> void:
    var before=ground(last);var after=ground(at)
    if before!=null and after!=null:
     world.planning_focus+=before-after
-    world.planning_focus.x=clampf(world.planning_focus.x,-18,18)
-    world.planning_focus.z=clampf(world.planning_focus.z,-45,17)
+    world.planning_focus.x=clampf(world.planning_focus.x,Defs.WORLD_BOUNDS.position.x,Defs.WORLD_BOUNDS.end.x)
+    world.planning_focus.z=clampf(world.planning_focus.z,Defs.WORLD_BOUNDS.position.y,Defs.WORLD_BOUNDS.end.y)
+    world.planning_focus.y=Defs.height_at(Vector2(world.planning_focus.x,world.planning_focus.z))
   elif not blocked(at): append_point(at)
   last=at
  elif release and id==active:
@@ -104,6 +126,7 @@ func commit() -> void:
  ui.toast(game.logistics.message);update()
 
 func update() -> void:
+ ui.map_button.visible=not editing
  ui.view_button.visible=not editing
  ui.logistics_button.visible=not editing
  toolbar.visible=editing and not ui.modal_open

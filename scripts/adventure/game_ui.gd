@@ -6,6 +6,10 @@ signal view_changed
 signal menu_changed(open: bool)
 signal sound_changed(on: bool)
 signal vibration_changed(on: bool)
+var map_button: Button
+var map_panel: PanelContainer
+var map_canvas: Control
+var map_close: Button
 var logistics_button: Button
 var logistics_panel
 var root: Control
@@ -105,6 +109,9 @@ func setup(state, ui_font: Font) -> void:
  logistics_button.add_theme_font_size_override("font_size",14)
  logistics_button.pressed.connect(func():show_logistics(not logistics_panel.visible))
  root.add_child(logistics_button)
+ map_button=button("全体地図")
+ map_button.pressed.connect(func():show_map(not map_panel.visible))
+ root.add_child(map_button)
  goal_label = text("",15)
  goal_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
  root.add_child(goal_label)
@@ -176,7 +183,7 @@ func setup(state, ui_font: Font) -> void:
  tabs.add_theme_constant_override("separation",6)
  content.add_child(tabs)
  for area in 3:
-  var tab=button(Defs.AREA_NAMES[area])
+  var tab=button(Defs.SHORT_NAMES[area])
   tab.custom_minimum_size.x=80
   tab.size_flags_horizontal=Control.SIZE_EXPAND_FILL
   tab.pressed.connect(func(): selected_area=area)
@@ -216,6 +223,18 @@ func setup(state, ui_font: Font) -> void:
  logistics_panel.setup(game,self)
  logistics_panel.visible=false
  logistics_panel.close_requested.connect(func():show_logistics(false))
+ map_panel=PanelContainer.new()
+ map_panel.add_theme_stylebox_override("panel",style(Color("eff6f1"),22))
+ root.add_child(map_panel)
+ var map_layout=VBoxContainer.new();map_panel.add_child(map_layout)
+ var map_header=HBoxContainer.new();map_layout.add_child(map_header)
+ var map_title=text("流域の地図",21);map_title.size_flags_horizontal=Control.SIZE_EXPAND_FILL;map_header.add_child(map_title)
+ map_close=button("閉じる");map_close.pressed.connect(func():show_map(false));map_header.add_child(map_close)
+ map_canvas=preload("res://scripts/adventure/map_view.gd").new();map_canvas.game=game;map_canvas.font=font
+ map_canvas.custom_minimum_size=Vector2(200,200);map_canvas.size_flags_vertical=Control.SIZE_EXPAND_FILL;map_layout.add_child(map_canvas)
+ var map_note=text("金：中央基地　赤：現在地\n遠方の良質材は2〜3倍。\n倉庫では入金されません。基地へ届けよう。",13)
+ map_layout.add_child(map_note)
+ map_panel.visible=false
  get_viewport().size_changed.connect(resize)
  resize()
 
@@ -233,6 +252,8 @@ func resize() -> void:
  menu_button.size = Vector2(94,48)
  logistics_button.position=Vector2(left,132)
  logistics_button.size=Vector2(112,44)
+ map_button.position=Vector2(left+(width-100)/2,132)
+ map_button.size=Vector2(100,44)
  view_button.position=Vector2(left+width-100,132)
  view_button.size=Vector2(100,44)
  goal_label.position = Vector2(left+16,86)
@@ -246,12 +267,16 @@ func resize() -> void:
  modal.position = Vector2((size.x-modal.size.x)/2,maxf(8,(size.y-modal.size.y)/2))
  root.get_node("Brand").position = Vector2(left+16,22)
  stick.size = size
+ if map_panel!=null:
+  map_panel.size=Vector2(minf(size.x-28,390),minf(size.y-24,720))
+  map_panel.position=(size-map_panel.size)/2
  if logistics_panel!=null:
   logistics_panel.size=Vector2(minf(size.x-28,390),minf(size.y-24,720))
   logistics_panel.position=(size-logistics_panel.size)/2
 
 func show_menu(open: bool) -> void:
  modal_open = open
+ if map_panel!=null: map_panel.visible=false
  if logistics_panel!=null: logistics_panel.visible=false
  modal.visible = open
  root.get_node("Shade").visible = open
@@ -259,6 +284,7 @@ func show_menu(open: bool) -> void:
  resize()
 
 func show_logistics(open: bool) -> void:
+ map_panel.visible=false
  modal.visible=false
  logistics_panel.visible=open
  modal_open=open
@@ -267,8 +293,15 @@ func show_logistics(open: bool) -> void:
  menu_changed.emit(open)
  resize()
 
+func show_map(open: bool) -> void:
+ modal.visible=false;logistics_panel.visible=false
+ map_panel.visible=open;modal_open=open
+ root.get_node("Shade").visible=open
+ menu_changed.emit(open);resize()
+ map_canvas.queue_redraw()
+
 func blocked(at: Vector2) -> bool:
- return modal_open or root.get_node("Top").get_global_rect().has_point(at) or view_button.get_global_rect().has_point(at) or logistics_button.get_global_rect().has_point(at)
+ return modal_open or map_button.get_global_rect().has_point(at) or root.get_node("Top").get_global_rect().has_point(at) or view_button.get_global_rect().has_point(at) or logistics_button.get_global_rect().has_point(at)
 
 func toast(value: String) -> void:
  toast_text = value
@@ -286,8 +319,8 @@ func update(delta: float, controller, camera: Camera3D) -> void:
  bag_label.text = "%d / %d 本" % [game.bag.size(),game.capacity()]
  goal_label.text = game.goal().text
  var hint = "ドラッグで移動 · 木のそばで止まると伐採"
- if game.position.distance_to(game.nearest_sale())<1.3: hint = "売り場 · 止まると一本ずつ荷下ろし"
- elif game.bag.size()>=game.capacity(): hint = "満載！ 売り場か建設の青い円へ運ぼう"
+ if game.position.distance_to(game.nearest_sale())<1.3: hint = "中央基地 · 止まると出荷して入金"
+ elif game.bag.size()>=game.capacity(): hint = "満載！ 中央基地か建設の青い円へ運ぼう"
  elif game.target>=0: hint = "伐採中 · 動くとすぐに中断できる"
  if game.target>=0 and game.ground.size()+Defs.KINDS[game.trees[game.target].kind]["yield"]>Defs.MAX_GROUND: hint = "落ちている丸太を先に運ぼう"
  for project in Defs.PROJECTS:
@@ -302,7 +335,7 @@ func update(delta: float, controller, camera: Camera3D) -> void:
  hint_label.text = toast_text if toast_time>0 else hint
  view_button.text="視野：最大" if game.wide_view else "視野：広い"
  for area in 3:
-  area_buttons[area].text=("● " if selected_area==area else "")+Defs.AREA_NAMES[area]
+  area_buttons[area].text=("● " if selected_area==area else "")+Defs.SHORT_NAMES[area]
  var auto=game.automation
  var open=game.area_open(selected_area)
  stock_label.text="倉庫 %d / %d 本 · 作業員の荷物 %d 本" % [auto.stocks[selected_area].size(),auto.capacity(selected_area),auto.cutters[selected_area].cargo.size()+auto.porters[selected_area].cargo.size()] if open else "橋を完成すると、この森にも設備を建てられます"
@@ -325,18 +358,18 @@ func update(delta: float, controller, camera: Camera3D) -> void:
  stick.queue_redraw()
  if logistics_panel.visible: logistics_panel.refresh()
  var p = game.goal().position
- var projected = camera.unproject_position(Vector3(p.x,0.4,p.y))
+ var projected = camera.unproject_position(Defs.point(p,0.4))
  var size = get_viewport().get_visible_rect().size
- var safe = Rect2(38,155,size.x-76,size.y-270)
+ var safe = Rect2(38,190,size.x-76,size.y-305)
  navigation.visible = not modal_open and not safe.has_point(projected)
- var at = Vector2(clampf(projected.x,40,size.x-100),clampf(projected.y,155,size.y-110))
+ var at = Vector2(clampf(projected.x,40,size.x-100),clampf(projected.y,190,size.y-110))
  navigation.position = at
  var distance = game.position.distance_to(p)
- navigation.text = "%s %s %dm" % ["↑" if projected.y<155 else ("↓" if projected.y>size.y-110 else ("←" if projected.x<40 else "→")),game.goal().label,int(distance)]
+ navigation.text = "%s %s %dm" % ["↑" if projected.y<190 else ("↓" if projected.y>size.y-110 else ("←" if projected.x<40 else "→")),game.goal().label,int(distance)]
 
 func summary() -> Dictionary:
- var result = {"width":get_viewport().get_visible_rect().size.x,"height":get_viewport().get_visible_rect().size.y,"modal":modal_open}
- var nodes = {"menu":menu_button,"close":close_button,"sound":sound_button,"vibration":vibration_button,"view":view_button,"logistics":logistics_button}
+ var result = {"width":get_viewport().get_visible_rect().size.x,"height":get_viewport().get_visible_rect().size.y,"modal":modal_open,"map_open":map_panel.visible}
+ var nodes = {"menu":menu_button,"close":close_button,"sound":sound_button,"vibration":vibration_button,"view":view_button,"logistics":logistics_button,"map":map_button,"map_close":map_close}
  for key in rows: nodes[key] = rows[key].button
  for key in facility_rows: nodes[key]=facility_rows[key].button
  for area in 3: nodes["area%d" % area]=area_buttons[area]

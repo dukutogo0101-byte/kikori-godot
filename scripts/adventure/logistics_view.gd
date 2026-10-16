@@ -1,5 +1,6 @@
 extends Node3D
 const Art=preload("res://scripts/art.gd")
+const Defs=preload("res://scripts/adventure/definitions.gd")
 const Logic=preload("res://scripts/adventure/logistics.gd")
 var game
 var world
@@ -27,12 +28,12 @@ func setup(state, view) -> void:
  for area in 3:
   var p=Logic.DEPOTS[area]
   art.begin("depot")
-  art.box(Vector3(2.1,0.08,0),Vector3(2.7,0.16,2.5),Color("638f9e"))
-  for x in [1.0,3.2]:
-   for z in [-1.0,1.0]: art.box(Vector3(x,0.55,z),Vector3(0.13,1.1,0.13),Art.WOOD)
-  var building=world.mesh(self,art.finish(),Vector3(p.x,0,p.y))
-  var ring=world.mesh(self,art.ring(1.0,0.15,Color("6a9ac1")),Vector3(p.x,0.05,p.y))
-  var label=world.label(self,"",Vector3(p.x,0.85,p.y),Color("32617c"),38)
+  art.box(Vector3(-2.8,0.08,4.2),Vector3(2.7,0.16,2.5),Color("638f9e"))
+  for x in [-3.9,-1.7]:
+   for z in [3.2,5.2]: art.box(Vector3(x,0.55,z),Vector3(0.13,1.1,0.13),Art.WOOD)
+  var building=world.mesh(self,art.finish(),Defs.point(p))
+  var ring=world.mesh(self,art.ring(1.0,0.15,Color("6a9ac1")),Defs.point(p,0.05))
+  var label=world.label(self,"",Defs.point(p,0.85),Color("32617c"),38)
   var batches=[]
   for kind in 3: batches.append(world.batch(self,art.log_mesh(kind),112))
   depots.append({"building":building,"ring":ring,"label":label,"stocks":batches})
@@ -54,14 +55,14 @@ func update(delta: float) -> void:
   revision=logistics.revision
   var index=0
   for p in logistics.roads:
-   road_batch.multimesh.set_instance_transform(index,Transform3D(Basis.IDENTITY,Vector3(p.x,0.045,p.y)));index+=1
+   road_batch.multimesh.set_instance_transform(index,Transform3D(Defs.surface(Vector2(p)),Defs.point(Vector2(p),0.045)));index+=1
   road_batch.multimesh.visible_instance_count=index
  var key=str(world.road_preview)+str(world.road_preview_remove)+str(revision)
  if key!=preview_key:
   preview_key=key
   var i=0
   for p in world.road_preview:
-   preview_batch.multimesh.set_instance_transform(i,Transform3D(Basis.IDENTITY,Vector3(p.x,0.085,p.y)));i+=1
+   preview_batch.multimesh.set_instance_transform(i,Transform3D(Defs.surface(Vector2(p)),Defs.point(Vector2(p),0.085)));i+=1
   preview_batch.multimesh.visible_instance_count=i
   var valid=not world.road_preview_remove
   for p in world.road_preview:
@@ -79,7 +80,7 @@ func update(delta: float) -> void:
    for i in range(0,maxi(0,path.size()-1),3):
     if count>=512: break
     var difference=Vector2(path[i+1]-path[i]);var point=Vector2(path[i])+difference*0.4
-    arrows.multimesh.set_instance_transform(count,Transform3D(Basis(Vector3.UP,atan2(difference.x,difference.y)),Vector3(point.x,0.09,point.y)));count+=1
+    arrows.multimesh.set_instance_transform(count,Transform3D(Basis(Vector3.UP,atan2(difference.x,difference.y)),Defs.point(point,0.09)));count+=1
   arrows.multimesh.visible_instance_count=count
  arrows.visible=world.planning or world.show_routes
  for area in 3:
@@ -90,14 +91,14 @@ func update(delta: float) -> void:
   var counts=[0,0,0]
   for i in logistics.stocks[area].size():
    var log=logistics.stocks[area][i]
-   var p=Vector3(at.x+1.0+(i%8)*0.3,0.25+floori(float(i)/8)*0.2,at.y)
+   var p=Vector3(at.x-3.9+(i%8)*0.3,0.25+floori(float(i)/8)*0.2,at.y+4.2)
    node.stocks[log.kind].multimesh.set_instance_transform(counts[log.kind],Transform3D(Basis(Vector3.UP,PI/2).scaled(Vector3.ONE*0.65),p))
    counts[log.kind]+=1
   for kind in 3: node.stocks[kind].multimesh.visible_instance_count=counts[kind]
  for i in carts.size():
   var node=carts[i];node.root.visible=i<logistics.carts.size()
   if not node.root.visible: continue
-  var cart=logistics.carts[i];var at=Vector3(cart.position.x,0,cart.position.y)
+  var cart=logistics.carts[i];var at=Defs.point(cart.position)
   var difference=at-node.previous
   if difference.length()>0.001: node.root.rotation.y=atan2(difference.x,difference.z)
   node.previous=at;node.root.position=at

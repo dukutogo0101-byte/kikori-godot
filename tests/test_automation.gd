@@ -14,7 +14,13 @@ func roundtrip(game) -> void:
  var restored=State.new()
  check(restored.restore(json_copy(game.snapshot())),"Automation save restores atomically")
  check(restored.conserved(),"All worker and storage inventories conserve resources")
- check(restored.money==game.money and restored.automation.snapshot()==game.automation.snapshot(),"Worker positions, cargo, equipment and money round trip")
+ var original=game.automation.snapshot();var loaded=restored.automation.snapshot()
+ for role in ["cutters","porters"]:
+  for area in 3:
+   check(absf(original[role][area].clock-loaded[role][area].clock)<1e-12,"JSON preserves work clock within floating-point precision")
+   original[role][area].clock=0.0;loaded[role][area].clock=0.0
+ check(restored.money==game.money and original==loaded,"Worker positions, cargo, equipment and money round trip")
+
 func earned_start():
  var game=State.new()
  # Produce real identified logs and sell them to seed a legal economy fixture.
@@ -81,21 +87,10 @@ func _initialize() -> void:
   var original=JSON.stringify(game.snapshot())
   check(not game.restore(damaged),"Invalid automation data is rejected")
   check(JSON.stringify(game.snapshot())==original,"Failed restore changes no live state")
- # Legacy game has the stable original tree prefix and no automation fields.
- var legacy=earned_start().snapshot()
- legacy.version=2
- legacy.trees.resize(Defs.legacy_tree_layout().size())
- # Remove the added grove's production from this legacy fixture.
- var produced=0
- for i in legacy.trees.size(): produced+=legacy.trees[i].cycle*Defs.KINDS[Defs.legacy_tree_layout()[i].kind]["yield"]
- legacy.created=[produced,0,0];legacy.sold=[produced,0,0];legacy.next_id=produced+1;legacy.money=produced*10
- legacy.erase("automation");legacy.erase("wide_view")
- var migrated=State.new()
- check(migrated.restore(json_copy(legacy)),"Progressed v2 save migrates")
- check(migrated.money==legacy.money and migrated.trees.size()>legacy.trees.size() and migrated.automation.levels[0].camp==0,"Legacy money and tree IDs survive with fresh outer groves")
- check(migrated.snapshot().version==4,"Next save writes current version")
- roundtrip(migrated)
- # All regional markets accept manual sales with the same price and IDs.
+ # New watershed map uses a distinct save format; old worlds are not misread.
+ var old_world=earned_start().snapshot();old_world.version=4
+ check(not State.new().restore(json_copy(old_world)),"Old world coordinates cannot enter the redesigned world")
+ # Every species must physically return to the single central terminal.
  var regional=State.new()
  regional.projects.bridge=60;regional.projects.high_bridge=120
  regional.trees[0].cycle=60;regional.trees[0].hp=0;regional.trees[0].harvested=true;regional.trees[0].regrow=32.0
@@ -107,11 +102,11 @@ func _initialize() -> void:
   regional.trees[index].hp=0;regional.fell(index)
   while not regional.ground.is_empty():
    var log=regional.ground.pop_back()
-   regional.bag.append({"id":log.id,"kind":log.kind})
-  regional.position=Defs.MARKETS[0 if area==0 else area+1].position
+   regional.bag.append({"id":log.id,"kind":log.kind,"quality":log.quality})
+  regional.position=Defs.SALE
   var starting=regional.money
   advance(regional,1)
-  check(regional.bag.is_empty() and regional.money==starting+Defs.KINDS[area]["yield"]*regional.value(area),"Each forest's market sells correct local wood")
+  check(regional.bag.is_empty() and regional.money==starting+Defs.KINDS[area]["yield"]*regional.value(area,regional.trees[index].quality),"Each forest's market sells correct local wood")
  roundtrip(regional)
  for area in 3:
   var cost=regional.automation.price(area,"camp")+regional.automation.price(area,"porter")

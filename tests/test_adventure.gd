@@ -77,9 +77,9 @@ func _initialize() -> void:
  # Trees, building, shore, closed bridge.
  check(not game.walkable(Vector2(-3.4,3.1)),"Tree trunk collision")
  check(not game.walkable(Vector2(4,6)),"Building collision")
- check(not game.walkable(Vector2(18.1,3)),"Shore collision")
- check(not game.walkable(Vector2(0,-8.5)),"Unbuilt bridge is impassable")
- check(not game.walkable(Vector2(0,-14)),"Locked island is impassable")
+ check(not game.walkable(Vector2(64,3)),"Shore collision")
+ check(not game.walkable(Vector2(0,-41.5)),"Unbuilt bridge is impassable")
+ check(not game.walkable(Vector2(0,-52)),"Locked island is impassable")
  game.position=Vector2(-3.4,4.2)
  idle(0.21)
  var hp=game.trees[1].hp
@@ -128,15 +128,15 @@ func _initialize() -> void:
   path(Defs.PROJECTS[0].position);idle(4)
   check(game.conserved(),"Bridge trip conserves wood")
  check(game.complete("bridge"),"First bridge can be completed without buying anything else")
- check(game.walkable(Vector2(0,-8.5)),"Completed bridge is walkable")
- check(game.walkable(Vector2(0,-14)),"New island unlocks")
+ check(game.walkable(Vector2(0,-41.5)),"Completed bridge is walkable")
+ check(game.walkable(Vector2(0,-52)),"New island unlocks")
  snapshot_ok()
  var bridge_time=game.bridge_time
  fill(1)
  check(game.bag.size()>0 and game.bag[0].kind==1,"Harvest new valuable species")
  var funds=game.money
  var expected=0
- for log in game.bag: expected+=game.value(log.kind)
+ for log in game.bag: expected+=game.log_value(log)
  sell()
  check(game.money==funds+expected,"New species sells for correct value")
  # Build the workshop, then the final bridge: an achievable ten-minute progression.
@@ -147,10 +147,10 @@ func _initialize() -> void:
    path(project.position);idle(4)
   check(game.complete(project.id),"Project %s is reachable" % project.id)
   snapshot_ok()
- check(game.value(1)==36,"Workshop improves sale value")
+ check(game.value(1,1)==72,"Workshop improves sale value")
  sell()
  # Cross the second bridge with physical movement, not teleportation.
- path(Vector2(0,-24.5));move(Vector2(6,-24.5));move(Vector2(6,-30));move(Vector2(0,-30))
+ path(Vector2(0,-106));move(Vector2(6,-106));move(Vector2(6,-130));move(Vector2(0,-130))
  fill(2)
  check(game.bag[0].kind==2,"Third forest has a distinct species")
  snapshot_ok()
@@ -180,7 +180,7 @@ func _initialize() -> void:
  for invalid in bads:
   check(not game.restore(invalid),"Corrupt state rejected")
   check(JSON.stringify(game.snapshot())==before,"Rejected restore is atomic")
- bad=valid.duplicate(true);bad.position=[0,-8.5]
+ bad=valid.duplicate(true);bad.position=[0,-41.5]
  check(game.restore(bad) and game.position==Defs.SPAWN,"Unsafe resume position uses safe spawn")
  var store=Store.new("user://kikori_adventure_test.json")
  check(store.write_save(game.snapshot()),"Atomic native save")

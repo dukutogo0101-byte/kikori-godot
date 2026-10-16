@@ -1,4 +1,18 @@
-# Snow Trail verification
+# Watersheds verification
+
+## Redesigned world (v5)
+
+The v5 world replaces the old island layout, following the user's explicit approval to reset the old base surroundings. The previous `kikori.adventure.v2` save is untouched; this world saves under `kikori.watersheds.v5`. Old coordinates are not partially migrated into the new rivers.
+
+- Land outline area: 31,372m², versus 2,016m² previously. A 1m walking-grid flood reaches approximately 29,400 cells and an approach to every one of 322 trees.
+- Terrain height, bank polygons, lakes, rocks, actor elevations and road placement share the same definitions. The editor intersects the heightfield, including steep lake rims. Roads align to local slope.
+- Exactly one sale terminal, at the central base. Remote depots reserve and hold stock without paying; porters and carts traverse bridges to deliver. Far timber carries quality through every inventory and save.
+- Local checks: direct loop 5, adventure 144, automation 112, logistics 175, scene 87, plus the new watershed suite. All passed before browser checks. The watershed suite separately checks every grove's reachability, all base-return paths, regional locks, collision, quality and terminal-only revenue.
+- Deterministic physical progression: first cut 4.17s, first sale 15.52s, first upgrade 19.40s, first bridge 281.25s, all projects and first birch harvest about 17–18 minutes. Reading, route planning and input learning are excluded.
+- Current browser CI checks the exported game from zero, first bridge and distant amber round trip, full-map modal in both orientations, elevated highland rendering, linked carts, touch road editing, pause/reload, denied/corrupt storage and preserved old-world data. Actions results are authoritative; physical phone performance remains unmeasured.
+
+The sections below are historical evidence for earlier layouts; their map counts, coordinates and save migration behavior do not describe v5.
+
 
 ## Verification scope
 

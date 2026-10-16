@@ -71,6 +71,18 @@ func run() -> void:
  check(scene.game.position==at,"Drawing roads never moves the hero")
  scene.roads.reset();check(scene.roads.preview.is_empty(),"Canceling input discards an unconfirmed road")
  scene.roads.finish();check(c.enabled,"Leaving the editor restores movement")
+ ui.show_map(true)
+ await process_frame
+ check(ui.map_close.get_global_rect().position.y>=0 and ui.map_panel.size.y<=root.get_visible_rect().size.y-12,"Map and its close button fit inside the viewport")
+ check(ui.modal_open and ui.map_panel.visible and not c.enabled,"World map pauses play and blocks movement")
+ ui.show_map(false)
+ check(c.enabled,"Closing the map restores movement")
+ scene.roads.start(Vector2(28,-90));scene.world.update(0)
+ var hill=scene.game.Defs.point(Vector2(28,-90))
+ var projected=scene.world.camera.unproject_position(hill)
+ var hit=scene.roads.ground(projected)
+ check(hit!=null and hit.distance_to(hill)<0.025,"Screen drawing intersects the actual elevated terrain")
+ scene.roads.finish()
  var count=scene.world.counts().nodes
  # Many presentation events stress the fixed pools; logical resources are untouched.
  for i in 36000:
