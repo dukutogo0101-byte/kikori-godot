@@ -5,3 +5,4 @@ reports/
 node_modules/
 __pycache__/
 .DS_Store
+assets/baked/

@@ -7,6 +7,10 @@ func _ready() -> void:
   var player = AudioStreamPlayer.new()
   player.max_polyphony = 4
   player.volume_db = -17 if key in ["pickup","deposit"] else -12
+  if OS.has_feature("web"):
+   player.stream=load("res://assets/baked/sound_%s.res" % key)
+   add_child(player);voices[key]=player
+   continue
   var wave = AudioStreamWAV.new()
   wave.format = AudioStreamWAV.FORMAT_16_BITS
   wave.mix_rate = 22050
@@ -20,6 +24,9 @@ func _ready() -> void:
    var tone = sin(TAU*(frequency+350*t)*t)*0.48+sin(TAU*frequency*1.5*t)*0.16
    samples.encode_s16(i*2,int(clampf(tone*envelope,-1,1)*18000))
   wave.data = samples
+  if preload("res://scripts/art.gd").baking:
+   var error=ResourceSaver.save(wave,"res://assets/baked/sound_%s.res" % key)
+   assert(error==OK)
   player.stream = wave
   add_child(player)
   voices[key] = player

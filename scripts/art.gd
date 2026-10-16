@@ -11,6 +11,9 @@ const CREAM = Color("f5e6bc")
 const TEAL = Color("247f83")
 const ROOF = Color("d06942")
 const DARK = Color("304c49")
+static var baking = false
+static var baked_files = {}
+var mesh_key = ""
 var surface: SurfaceTool
 var material: StandardMaterial3D
 
@@ -21,16 +24,33 @@ func _init() -> void:
  material.roughness = 0.92
  material.cull_mode = BaseMaterial3D.CULL_DISABLED
 
-func begin() -> void:
+func cached(key: String) -> ArrayMesh:
+ return load("res://assets/baked/%s.res" % key) as ArrayMesh
+
+func begin(key: String) -> void:
+ mesh_key=key
+ if OS.has_feature("web"): return
  surface = SurfaceTool.new()
  surface.begin(Mesh.PRIMITIVE_TRIANGLES)
 
 func finish() -> ArrayMesh:
+ if OS.has_feature("web"): return cached(mesh_key)
  surface.generate_normals()
  surface.set_material(material)
- return surface.commit()
+ var result=surface.commit()
+ if baking:
+  var path="res://assets/baked/%s.res" % mesh_key
+  assert(not mesh_key.is_empty())
+  if not baked_files.has(mesh_key):
+   var error=ResourceSaver.save(result,path)
+   assert(error==OK)
+   baked_files[mesh_key]=path
+  else:
+   assert(result.surface_get_arrays(0)==cached(mesh_key).surface_get_arrays(0),"Baked key identifies identical geometry: "+mesh_key)
+ return result
 
 func tri(a: Vector3, b: Vector3, c: Vector3, color: Color) -> void:
+ if OS.has_feature("web"): return
  # Compatibility does not implement the material sRGB vertex-color flag.
  surface.set_color(color.srgb_to_linear())
  surface.add_vertex(a)
@@ -38,10 +58,12 @@ func tri(a: Vector3, b: Vector3, c: Vector3, color: Color) -> void:
  surface.add_vertex(c)
 
 func quad(a: Vector3, b: Vector3, c: Vector3, d: Vector3, color: Color) -> void:
+ if OS.has_feature("web"): return
  tri(a, b, c, color)
  tri(a, c, d, color)
 
 func box(p: Vector3, size: Vector3, color: Color) -> void:
+ if OS.has_feature("web"): return
  var x = size.x / 2.0
  var y = size.y / 2.0
  var z = size.z / 2.0
@@ -61,6 +83,7 @@ func box(p: Vector3, size: Vector3, color: Color) -> void:
  quad(d, c, b, a, color.darkened(0.25))
 
 func branch(a: Vector3, b: Vector3, radius_a: float, radius_b: float, color: Color, sides: int = 7) -> void:
+ if OS.has_feature("web"): return
  var direction = (b - a).normalized()
  var tangent = direction.cross(Vector3.RIGHT if absf(direction.y) > 0.9 else Vector3.UP).normalized()
  var bitangent = direction.cross(tangent).normalized()
@@ -74,6 +97,7 @@ func branch(a: Vector3, b: Vector3, radius_a: float, radius_b: float, color: Col
   tri(b, b + r1 * radius_b, b + r2 * radius_b, CUT if color == WOOD else color)
 
 func crown(p: Vector3, size: Vector3, color: Color, seed_value: int = 0) -> void:
+ if OS.has_feature("web"): return
  var rings = [Vector2(0.0, -0.72), Vector2(0.72, -0.43), Vector2(1.0, 0.0), Vector2(0.69, 0.57), Vector2(0.0, 0.92)]
  for j in 4:
   for i in 7:
@@ -91,7 +115,9 @@ func crown(p: Vector3, size: Vector3, color: Color, seed_value: int = 0) -> void
 
 func log_mesh(kind: int = 0) -> ArrayMesh:
  var bark = [WOOD, Color("b5793e"), Color("d8e8ed")][kind]
- begin()
+ var key="log_%d" % kind
+ if OS.has_feature("web"): return cached(key)
+ begin(key)
  branch(Vector3(0, 0, -0.65), Vector3(0, 0, 0.65), 0.16, 0.14, bark, 8)
  branch(Vector3(0, 0, -0.655), Vector3(0, 0, -0.66), 0.125, 0.125, CUT, 8)
  branch(Vector3(0, 0, 0.655), Vector3(0, 0, 0.66), 0.11, 0.11, CUT, 8)
@@ -100,7 +126,9 @@ func log_mesh(kind: int = 0) -> ArrayMesh:
  return finish()
 
 func axe() -> ArrayMesh:
- begin()
+ var key="axe"
+ if OS.has_feature("web"): return cached(key)
+ begin(key)
  branch(Vector3(0, 0, 0), Vector3(0.03, 0.14, 0.55), 0.05, 0.045, WOOD, 6)
  box(Vector3(0.03, 0.13, 0.51), Vector3(0.04, 0.31, 0.22), Color("acc5c2"))
  box(Vector3(0, 0, 0.03), Vector3(0.12, 0.12, 0.17), Color("edb27e"))
@@ -108,7 +136,9 @@ func axe() -> ArrayMesh:
 
 
 func snow_tree(kind: int) -> ArrayMesh:
- begin()
+ var key="tree_%d" % kind
+ if OS.has_feature("web"): return cached(key)
+ begin(key)
  var bark = Color("8c684e") if kind != 2 else Color("e4eceb")
  var height = 2.8 + kind * 0.25
  branch(Vector3.ZERO,Vector3(0.06,height,0),0.2+kind*0.03,0.07,bark,7)
@@ -137,7 +167,9 @@ func snow_tree(kind: int) -> ArrayMesh:
  return finish()
 
 func hero_body() -> ArrayMesh:
- begin()
+ var key="hero_body"
+ if OS.has_feature("web"): return cached(key)
+ begin(key)
  box(Vector3(0,0.94,0),Vector3(0.5,0.55,0.34),Color("e46c48"))
  box(Vector3(0,0.69,0),Vector3(0.52,0.1,0.36),Color("244c62"))
  for x in [-0.16,0.16]:
@@ -157,14 +189,18 @@ func hero_body() -> ArrayMesh:
  return finish()
 
 func hero_leg() -> ArrayMesh:
- begin()
+ var key="hero_leg"
+ if OS.has_feature("web"): return cached(key)
+ begin(key)
  branch(Vector3(0,0,0),Vector3(0,-0.42,0),0.115,0.11,Color("27546d"),6)
  box(Vector3(0,-0.47,0.07),Vector3(0.22,0.18,0.36),Color("334b59"))
  box(Vector3(0,-0.56,0.07),Vector3(0.23,0.05,0.36),Color("f2d5a0"))
  return finish()
 
 func island(rect: Rect2, kind: int) -> ArrayMesh:
- begin()
+ var key="island_%d" % kind
+ if OS.has_feature("web"): return cached(key)
+ begin(key)
  var r = rect.grow(0.45)
  var points = [Vector2(r.position.x+0.6,r.position.y),Vector2(r.end.x-0.6,r.position.y),Vector2(r.end.x,r.position.y+0.6),Vector2(r.end.x,r.end.y-0.6),Vector2(r.end.x-0.6,r.end.y),Vector2(r.position.x+0.6,r.end.y),Vector2(r.position.x,r.end.y-0.6),Vector2(r.position.x,r.position.y+0.6)]
  var snow = [Color("dceaf1"),Color("dedde9"),Color("d3eaf4")][kind]
@@ -188,7 +224,9 @@ func island(rect: Rect2, kind: int) -> ArrayMesh:
  return finish()
 
 func station(workshop: bool = false) -> ArrayMesh:
- begin()
+ var key="station_%d" % int(workshop)
+ if OS.has_feature("web"): return cached(key)
+ begin(key)
  var wall = Color("47798b") if workshop else Color("bb8156")
  box(Vector3(0,1,0),Vector3(3.1,2,2.1),wall)
  for i in 13:
@@ -214,7 +252,9 @@ func station(workshop: bool = false) -> ArrayMesh:
  return finish()
 
 func bridge(rect: Rect2) -> ArrayMesh:
- begin()
+ var key="bridge_%d_%d" % [roundi(rect.position.x),roundi(rect.position.y)]
+ if OS.has_feature("web"): return cached(key)
+ begin(key)
  for i in 12:
   var z = rect.position.y+(i+0.5)*rect.size.y/12
   box(Vector3(rect.get_center().x,0.015,z),Vector3(rect.size.x,0.1,rect.size.y/12-0.025),CUT.darkened(0.015*(i%3)))
@@ -227,7 +267,9 @@ func bridge(rect: Rect2) -> ArrayMesh:
  return finish()
 
 func ring(radius: float, width: float, color: Color) -> ArrayMesh:
- begin()
+ var key="ring_%d_%d_%s" % [roundi(radius*1000),roundi(width*1000),color.to_html()]
+ if OS.has_feature("web"): return cached(key)
+ begin(key)
  for i in 40:
   var a = TAU*i/40; var b = TAU*(i+1)/40
   quad(Vector3(cos(a)*radius,0,sin(a)*radius),Vector3(cos(b)*radius,0,sin(b)*radius),Vector3(cos(b)*(radius-width),0,sin(b)*(radius-width)),Vector3(cos(a)*(radius-width),0,sin(a)*(radius-width)),color)
@@ -235,7 +277,9 @@ func ring(radius: float, width: float, color: Color) -> ArrayMesh:
 
 
 func camp() -> ArrayMesh:
- begin()
+ var key="camp"
+ if OS.has_feature("web"): return cached(key)
+ begin(key)
  box(Vector3(0,0.07,0),Vector3(3.2,0.14,2.2),CUT)
  for x in [-1.45,1.45]:
   for z in [-0.95,0.95]: box(Vector3(x,0.9,z),Vector3(0.18,1.8,0.18),WOOD)
@@ -247,7 +291,9 @@ func camp() -> ArrayMesh:
  return finish()
 
 func cart() -> ArrayMesh:
- begin()
+ var key="cart"
+ if OS.has_feature("web"): return cached(key)
+ begin(key)
  box(Vector3(0,0.4,-1.0),Vector3(1.1,0.12,1.65),CUT)
  for x in [-0.54,0.54]:
   box(Vector3(x,0.65,-1.0),Vector3(0.08,0.5,1.65),WOOD)
@@ -256,7 +302,9 @@ func cart() -> ArrayMesh:
  return finish()
 
 func sawmill() -> ArrayMesh:
- begin()
+ var key="sawmill"
+ if OS.has_feature("web"): return cached(key)
+ begin(key)
  box(Vector3(0,0.5,0),Vector3(0.9,1,1.8),TEAL)
  box(Vector3(0,1.1,0),Vector3(1.2,0.1,2),CUT)
  branch(Vector3(-0.045,1.35,0),Vector3(0.045,1.35,0),0.42,0.42,Color("b7cbd2"),16)

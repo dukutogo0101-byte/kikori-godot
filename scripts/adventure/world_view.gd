@@ -96,7 +96,7 @@ func setup(state, ui_font: Font) -> void:
  sun.directional_shadow_max_distance = 45
  add_child(sun)
  # A calm frozen river under the raised snowy banks.
- art.begin()
+ art.begin("water")
  art.box(Vector3(0,-1, -15),Vector3(60,0.1,100),Color("8dbacb"))
  for i in 25:
   art.box(Vector3(-12+fmod(i*7.3,24),-0.94,-47+i*2.8),Vector3(2.4,0.015,0.05),Color("a8d0df"))
@@ -113,7 +113,7 @@ func setup(state, ui_font: Font) -> void:
   mesh(self,art.ring(1.23,0.14,Color("e7b651")),Vector3(p.x,0.03,p.y))
  for area in 3:
   var p=Defs.CAMPS[area]
-  art.begin()
+  art.begin("camp_base_%d" % area)
   art.box(Vector3(p.x,0.012,p.y-2.7),Vector3(3.2,0.024,2.2),Color("b3cec1"))
   mesh(self,art.finish())
   var building=mesh(self,art.camp(),Vector3(p.x,0,p.y-2.7))
@@ -136,7 +136,7 @@ func setup(state, ui_font: Font) -> void:
   label(self,"琥珀の森 · 24 / 本" if i==1 else "銀の森 · 50 / 本",Vector3(0,0.7,Defs.AREAS[i].end.y-1.1),Color("6b502e") if i==1 else Color("2e6c8b"),43)
  sale_label = label(self,"木材売り場",Vector3(4,0.7,9),Color("61471e"),43)
  mesh(self,art.ring(1.23,0.14,Color("e7b651")),Vector3(4,0.03,9))
- art.begin()
+ art.begin("sale_stack")
  for i in 4:
   art.box(Vector3(3.25+i*0.48,0.2,10.4),Vector3(0.42,0.34,0.72),CUT_COLOR())
  mesh(self,art.finish())
@@ -148,12 +148,12 @@ func setup(state, ui_font: Font) -> void:
   var bridge_node = mesh(self,art.bridge(rect))
   bridges.append(bridge_node)
   # Unbuilt bridge has two visible bank posts but no walkable deck.
-  art.begin()
+  art.begin("bridge_posts_%d_%d" % [roundi(rect.position.x),roundi(rect.position.y)])
   for x in [rect.position.x+0.1,rect.end.x-0.1]:
    art.box(Vector3(x,0.35,rect.end.y+0.1),Vector3(0.2,0.7,0.2),Color("976b49"))
    art.box(Vector3(x,0.72,rect.end.y+0.1),Vector3(0.27,0.1,0.27),Color("e8f4fa"))
   mesh(self,art.finish())
- art.begin()
+ art.begin("workshop_frame")
  art.box(Vector3(-5,0.03,-21.2),Vector3(4,0.06,2.5),Color("83a9bb"))
  for x in [-6.7,-3.3]:
   for z in [-22.2,-20.2]: art.box(Vector3(x,0.65,z),Vector3(0.14,1.3,0.14),Art.WOOD)
@@ -173,7 +173,7 @@ func setup(state, ui_font: Font) -> void:
   add_child(root)
   var tree = mesh(root,shapes[t.kind])
   tree.rotation.y = i*1.37
-  art.begin()
+  art.begin("stump")
   art.branch(Vector3.ZERO,Vector3(0,0.18,0),0.22,0.2,Art.WOOD,7)
   var stump = mesh(self,art.finish(),root.position)
   trees.append({"root":root,"mesh":tree,"stump":stump})
@@ -204,7 +204,7 @@ func setup(state, ui_font: Font) -> void:
   var text = label(self,"",Vector3.ZERO,Color("c57c17"),37)
   text.visible = false
   effects.append({"node":node,"label":text,"age":-1.0,"from":Vector3.ZERO,"to":Vector3.ZERO,"type":"","id":-1})
- art.begin()
+ art.begin("chip")
  art.box(Vector3.ZERO,Vector3(0.12,0.07,0.07),Art.CUT)
  var chip_shape = art.finish()
  for i in 24:

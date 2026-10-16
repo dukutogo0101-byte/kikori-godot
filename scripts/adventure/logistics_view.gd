@@ -16,17 +16,17 @@ var route_key=""
 
 func setup(state, view) -> void:
  game=state;world=view
- art.begin();art.box(Vector3.ZERO,Vector3(0.96,0.035,0.96),Color("ba9874"))
+ art.begin("road");art.box(Vector3.ZERO,Vector3(0.96,0.035,0.96),Color("ba9874"))
  road_batch=world.batch(self,art.finish(),Logic.MAX_ROADS)
- art.begin();art.box(Vector3.ZERO,Vector3(0.88,0.045,0.88),Color("6bcbad"))
+ art.begin("road_preview");art.box(Vector3.ZERO,Vector3(0.88,0.045,0.88),Color("6bcbad"))
  preview_batch=world.batch(self,art.finish(),160)
  for color in [Color("64d3a5"),Color("e68b70")]:
   var material=StandardMaterial3D.new();material.shading_mode=BaseMaterial3D.SHADING_MODE_UNSHADED;material.albedo_color=color;preview_materials.append(material)
- art.begin();art.tri(Vector3(-0.16,0,0),Vector3(0.16,0,0),Vector3(0,0,0.42),Color("f5be58"))
+ art.begin("route_arrow");art.tri(Vector3(-0.16,0,0),Vector3(0.16,0,0),Vector3(0,0,0.42),Color("f5be58"))
  arrows=world.batch(self,art.finish(),512)
  for area in 3:
   var p=Logic.DEPOTS[area]
-  art.begin()
+  art.begin("depot")
   art.box(Vector3(2.1,0.08,0),Vector3(2.7,0.16,2.5),Color("638f9e"))
   for x in [1.0,3.2]:
    for z in [-1.0,1.0]: art.box(Vector3(x,0.55,z),Vector3(0.13,1.1,0.13),Art.WOOD)

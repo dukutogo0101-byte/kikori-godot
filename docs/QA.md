@@ -4,7 +4,7 @@
 
 Main contains the direct-control adventure and expanded forests from PRs #1–#2. The roads and logistics expansion is validated below before publication.
 
-This expansion was built locally with the pinned official Godot 4.5.2 and single-thread Web templates. Chromium Playwright 1.56 ran the actual Web export over a local HTTP server using software rendering. Local WebKit lacks native dependencies; CI retains the WebKit probe and browser checks. Physical Android/iPhone performance is unmeasured.
+This expansion was built locally with the pinned official Godot 4.5.2 and single-thread Web templates. The actual Web export is tested over HTTP using software rendering. Initial local Chromium gameplay/UI results used Playwright 1.56; the current CI pin is 1.64.0. Local WebKit was also made available for repeated-start and redraw diagnostics. Current browser results are recorded in Actions; physical audio devices are unavailable locally. Physical Android/iPhone performance is unmeasured.
 
 ## Confirmed locally
 
@@ -49,7 +49,7 @@ The original shader-only final copy allowed scripts and the offscreen scene to u
 
 ## Bounded rendering
 
-The expanded scene starts with 275 direct children, including fixed pools of 24 flying logs/labels and 24 chips. One hour of repeated events leaves the child count unchanged; active effects settle to zero and pending pickup IDs retire. Ground/cargo are MultiMesh batches capped at 160 / 30 logical logs. Nearby foreground trees fade and lose their shadow temporarily to keep the protagonist visible.
+The expanded scene starts with 276 direct children, including fixed pools of 24 flying logs/labels and 24 chips. One hour of repeated events leaves the child count unchanged; active effects settle to zero and pending pickup IDs retire. Ground/cargo are MultiMesh batches capped at 160 / 30 logical logs. Nearby foreground trees fade and lose their shadow temporarily to keep the protagonist visible.
 
 ## Real-device acceptance still pending
 
@@ -74,3 +74,15 @@ The game is optimized toward 30fps, but no physical-device frame rate, memory or
 - Endpoint lists are rebuilt only when available facilities change; continuous refresh must not reset a keyboard or touch selection in an open picker.
 - v4 validation accounts for all depot/cargo resource IDs, road and cart purchase costs, route geometry, depot capacity reservations and precise cart positions before committing a restored state. Existing storage key is preserved.
 - Carts can share roads and pass each other; traffic simulation and signals are outside this version. The existing porter remains a direct-sale option.
+
+## Startup hardening
+
+Repeated WebKit startup diagnostics reproduced an intermittent engine crash during procedural mesh generation (`quad` → `box` → world setup), plus memory-access failures and corrupt compressed script/font loading. A successful single run was insufficient to establish reliable startup.
+
+The Web build now loads 39 precomputed meshes and seven WAV resources. The pinned native Godot editor creates them before export from the same original geometry and synthesis code; native play retains procedural creation. The bake validates nonempty geometry/audio and asserts identical vertex arrays for every reused mesh key. Keys identify explicit model/scene parts rather than depending on construction order. Generated resources stay outside git and are rebuilt by `tools/build_web.sh`.
+
+`tests/browser_boot.py` checks 40 fresh WebKit contexts in CI before the existing redraw probe and gameplay tests. Each run requires the current save schema, intact resource accounting and UI; any console/page error or failed start fails the job without a retry. Public deployment still requires both browser jobs.
+
+The export uses text GDScript (`script_export_mode=0`), an uncompressed font import and uncompressed baked resources. Repeated diagnostic failures included invalid compressed tokenizer lengths, inconsistent vector indices and invalid FreeType data; this format avoids the affected runtime decompression paths. This is an observed compatibility workaround, not a claim about an upstream root cause. The pinned Godot version remains 4.5.2; comparison with 4.5.1 also reproduced an error.
+
+The legacy Playwright 1.56 bundle (WebKit 26.0) also produced memory traps after this export-format change on CI, despite 60 successful local starts. Verification uses Playwright 1.64 and its current browser builds; the 40-start, redraw, gameplay and error assertions remain required. No compatibility claim is made for the older WebKitGTK build.
