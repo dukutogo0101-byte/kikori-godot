@@ -360,12 +360,12 @@ func update(delta: float, controller, camera: Camera3D) -> void:
  var p = game.goal().position
  var projected = camera.unproject_position(Defs.point(p,0.4))
  var size = get_viewport().get_visible_rect().size
- var safe = Rect2(38,155,size.x-76,size.y-270)
+ var safe = Rect2(38,190,size.x-76,size.y-305)
  navigation.visible = not modal_open and not safe.has_point(projected)
- var at = Vector2(clampf(projected.x,40,size.x-100),clampf(projected.y,155,size.y-110))
+ var at = Vector2(clampf(projected.x,40,size.x-100),clampf(projected.y,190,size.y-110))
  navigation.position = at
  var distance = game.position.distance_to(p)
- navigation.text = "%s %s %dm" % ["↑" if projected.y<155 else ("↓" if projected.y>size.y-110 else ("←" if projected.x<40 else "→")),game.goal().label,int(distance)]
+ navigation.text = "%s %s %dm" % ["↑" if projected.y<190 else ("↓" if projected.y>size.y-110 else ("←" if projected.x<40 else "→")),game.goal().label,int(distance)]
 
 func summary() -> Dictionary:
  var result = {"width":get_viewport().get_visible_rect().size.x,"height":get_viewport().get_visible_rect().size.y,"modal":modal_open,"map_open":map_panel.visible}
