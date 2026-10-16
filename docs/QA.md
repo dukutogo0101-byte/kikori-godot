@@ -77,8 +77,10 @@ The game is optimized toward 30fps, but no physical-device frame rate, memory or
 
 ## Startup hardening
 
-Repeated WebKit startup diagnostics reproduced an intermittent engine crash during procedural mesh generation (`quad` → `box` → world setup), plus a separate memory-access failure while synthesizing feedback. A successful single run was insufficient to establish reliable startup.
+Repeated WebKit startup diagnostics reproduced an intermittent engine crash during procedural mesh generation (`quad` → `box` → world setup), plus memory-access failures and corrupt compressed script/font loading. A successful single run was insufficient to establish reliable startup.
 
 The Web build now loads 39 precomputed meshes and seven WAV resources. The pinned native Godot editor creates them before export from the same original geometry and synthesis code; native play retains procedural creation. The bake validates nonempty geometry/audio and asserts identical vertex arrays for every reused mesh key. Keys identify explicit model/scene parts rather than depending on construction order. Generated resources stay outside git and are rebuilt by `tools/build_web.sh`.
 
-`tests/browser_boot.py` checks 20 fresh WebKit contexts in CI before the existing redraw probe and gameplay tests. Each run requires the current save schema, intact resource accounting and UI; any console/page error or failed start fails the job without a retry. Public deployment still requires both browser jobs.
+`tests/browser_boot.py` checks 40 fresh WebKit contexts in CI before the existing redraw probe and gameplay tests. Each run requires the current save schema, intact resource accounting and UI; any console/page error or failed start fails the job without a retry. Public deployment still requires both browser jobs.
+
+The export uses text GDScript (`script_export_mode=0`), an uncompressed font import and uncompressed baked resources. Repeated diagnostic failures included invalid compressed tokenizer lengths, inconsistent vector indices and invalid FreeType data; this format avoids the affected runtime decompression paths. This is an observed compatibility workaround, not a claim about an upstream root cause. The pinned Godot version remains 4.5.2; comparison with 4.5.1 also reproduced an error.

@@ -42,7 +42,7 @@ func finish() -> ArrayMesh:
   var path="res://assets/baked/%s.res" % mesh_key
   assert(not mesh_key.is_empty())
   if not baked_files.has(mesh_key):
-   var error=ResourceSaver.save(result,path,ResourceSaver.FLAG_COMPRESS)
+   var error=ResourceSaver.save(result,path)
    assert(error==OK)
    baked_files[mesh_key]=path
   else:

@@ -25,7 +25,7 @@ func _ready() -> void:
    samples.encode_s16(i*2,int(clampf(tone*envelope,-1,1)*18000))
   wave.data = samples
   if preload("res://scripts/art.gd").baking:
-   var error=ResourceSaver.save(wave,"res://assets/baked/sound_%s.res" % key,ResourceSaver.FLAG_COMPRESS)
+   var error=ResourceSaver.save(wave,"res://assets/baked/sound_%s.res" % key)
    assert(error==OK)
   player.stream = wave
   add_child(player)
