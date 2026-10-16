@@ -4,7 +4,7 @@
 
 Main contains the direct-control adventure and expanded forests from PRs #1–#2. The roads and logistics expansion is validated below before publication.
 
-This expansion was built locally with the pinned official Godot 4.5.2 and single-thread Web templates. Chromium Playwright 1.64 ran the actual Web export over a local HTTP server using software rendering. Local WebKit lacks native dependencies; CI retains the WebKit probe and browser checks. Physical Android/iPhone performance is unmeasured.
+This expansion was built locally with the pinned official Godot 4.5.2 and single-thread Web templates. The actual Web export is tested over HTTP using software rendering. Initial local Chromium gameplay/UI results used Playwright 1.56; the current CI pin is 1.64.0. Local WebKit was also made available for repeated-start and redraw diagnostics. Current browser results are recorded in Actions; physical audio devices are unavailable locally. Physical Android/iPhone performance is unmeasured.
 
 ## Confirmed locally
 
