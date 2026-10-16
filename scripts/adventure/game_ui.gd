@@ -232,10 +232,8 @@ func setup(state, ui_font: Font) -> void:
  map_close=button("閉じる");map_close.pressed.connect(func():show_map(false));map_header.add_child(map_close)
  map_canvas=preload("res://scripts/adventure/map_view.gd").new();map_canvas.game=game;map_canvas.font=font
  map_canvas.custom_minimum_size=Vector2(200,200);map_canvas.size_flags_vertical=Control.SIZE_EXPAND_FILL;map_layout.add_child(map_canvas)
- var map_note=text("金：中央基地で入金　赤：現在地
-北の森ほど高価。倉庫への納品では入金されません。
-橋を建てて丘陵・高原へ。道路で帰り道をつなごう。",13)
- map_note.autowrap_mode=TextServer.AUTOWRAP_WORD_SMART;map_layout.add_child(map_note)
+ var map_note=text("金：中央基地　赤：現在地\n遠方の良質材は2〜3倍。\n倉庫では入金されません。基地へ届けよう。",13)
+ map_layout.add_child(map_note)
  map_panel.visible=false
  get_viewport().size_changed.connect(resize)
  resize()

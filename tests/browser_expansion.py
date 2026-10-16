@@ -45,6 +45,7 @@ def run(browser,url):
     snap(page,'watershed-map')
     tap(page,'map_close')
     assert not page.evaluate('window.kikoriUi.modal')
+    assert not page.evaluate('window.kikoriUi.modal')
     start=state(page)['position']
     tap(page,'view')
     page.wait_for_function('window.kikoriState.wide_view && window.kikoriState.render.camera_size > 35')

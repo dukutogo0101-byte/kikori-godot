@@ -19,10 +19,9 @@ func land(area: int) -> ArrayMesh:
      var a=piece[indices[i]];var b=piece[indices[i+1]];var c=piece[indices[i+2]]
      var center=(a+b+c)/3.0
      var height=Defs.height_at(center)
-     var color=[Color("dbe9d9"),Color("d6dbc3"),Color("dce8ed")][area]
-     if Defs.corridor(center): color=Color("bdc6ae") if area<2 else Color("c6d6d9")
-     elif height>2.1: color=color.lerp(Color("a8b7a6"),minf(0.45,(height-2.1)*0.15))
-     color=color.darkened(float(posmod(x*7+z*13,5))*0.009)
+     var color=[Color("aec59e"),Color("b6bf9c"),Color("c4d6d5")][area]
+     if height>2.1: color=color.lerp(Color("7f997f"),minf(0.45,(height-2.1)*0.15))
+     color=color.darkened(float(posmod(x*7+z*13,5))*0.003)
      # Godot's front face is clockwise, independent of clipping orientation.
      if (b-a).cross(c-a)<0: art.tri(Defs.point(a),Defs.point(b),Defs.point(c),color)
      else: art.tri(Defs.point(c),Defs.point(b),Defs.point(a),color)
@@ -72,4 +71,26 @@ func scenery() -> ArrayMesh:
     for j in 3:
      var stem=at+Vector3(j*0.13,0,cos(i+j)*0.15)
      art.branch(stem,stem+Vector3(sin(i)*0.1,0.35+j*0.09,0),0.025,0.01,Color("8c9c71"),3)
+ return art.finish()
+
+func trails() -> ArrayMesh:
+ var key="watershed_trails"
+ if OS.has_feature("web"): return art.cached(key)
+ art.begin(key)
+ for area in 3:
+  var routes=[Defs.porter_route(area)]
+  if area==0: routes.append([Vector2(0,13),Vector2(0,-38)])
+  if area==1: routes.append([Vector2(0,-106),Vector2(6,-106),Vector2(6,-113)])
+  for route in routes:
+   for i in range(route.size()-1):
+    var direction=(route[i+1]-route[i]).normalized()
+    var side=Vector2(-direction.y,direction.x)*0.65
+    var steps=ceili(route[i].distance_to(route[i+1]))
+    for j in steps:
+     var a=route[i].lerp(route[i+1],float(j)/steps)
+     var b=route[i].lerp(route[i+1],float(j+1)/steps)
+     var center=(a+b)*0.5
+     if not Defs.in_area(center,area): continue
+     var color=[Color("c7b58e"),Color("c6b38b"),Color("b2c0b5")][area]
+     art.quad(Defs.point(a-side,0.018),Defs.point(a+side,0.018),Defs.point(b+side,0.018),Defs.point(b-side,0.018),color)
  return art.finish()

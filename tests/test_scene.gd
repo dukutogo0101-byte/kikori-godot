@@ -72,6 +72,8 @@ func run() -> void:
  scene.roads.reset();check(scene.roads.preview.is_empty(),"Canceling input discards an unconfirmed road")
  scene.roads.finish();check(c.enabled,"Leaving the editor restores movement")
  ui.show_map(true)
+ await process_frame
+ check(ui.map_close.get_global_rect().position.y>=0 and ui.map_panel.size.y<=root.get_visible_rect().size.y-12,"Map and its close button fit inside the viewport")
  check(ui.modal_open and ui.map_panel.visible and not c.enabled,"World map pauses play and blocks movement")
  ui.show_map(false)
  check(c.enabled,"Closing the map restores movement")

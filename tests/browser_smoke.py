@@ -234,6 +234,7 @@ def inspect(browser, url, engine, full):
         assert page.evaluate('window.kikoriUi.map_open')
         capture(page,engine+'-watershed-map')
         tap(page,'map_close')
+        assert not page.evaluate('window.kikoriUi.modal')
         if engine == 'chromium':
             touch_checks(page, context)
         # Tapping UI and opening a modal must never create movement.

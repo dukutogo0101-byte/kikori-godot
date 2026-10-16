@@ -79,7 +79,7 @@ func _initialize() -> void:
  restored.position=Defs.SALE
  for tick in 10: restored.tick(0.1,Vector2.ZERO)
  check(restored.money==750 and restored.bag.is_empty() and restored.conserved(),"Only delivery to the base pays, once per log")
- restored.position=Vector2(24,-171)
+ restored.position=Vector2(-22,-182)
  check(restored.walkable(restored.position),"Far landscape fixture starts on a traversable hillside")
  var fixture_file=FileAccess.open("res://reports/watersheds-fixture.json",FileAccess.WRITE);fixture_file.store_string(JSON.stringify(restored.snapshot(),"",true,true));fixture_file.close()
  check(Store.KEY!="kikori.adventure.v2","New map does not overwrite the previous world's save key")

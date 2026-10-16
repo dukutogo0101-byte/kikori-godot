@@ -85,12 +85,12 @@ func setup(state, ui_font: Font) -> void:
  environment.environment.background_color = Color("b9dbea")
  environment.environment.ambient_light_source = Environment.AMBIENT_SOURCE_COLOR
  environment.environment.ambient_light_color = Color("e4f4ff")
- environment.environment.ambient_light_energy = 0.5
+ environment.environment.ambient_light_energy = 0.45
  environment.environment.tonemap_mode = Environment.TONE_MAPPER_LINEAR
  add_child(environment)
  var sun = DirectionalLight3D.new()
  sun.rotation_degrees = Vector3(-55,-30,0)
- sun.light_energy = 0.6
+ sun.light_energy = 0.5
  sun.shadow_opacity = 0.45
  sun.shadow_enabled = true
  sun.directional_shadow_max_distance = 45
@@ -99,6 +99,7 @@ func setup(state, ui_font: Font) -> void:
  mesh(self,terrain.water())
  for i in 3: mesh(self,terrain.land(i))
  mesh(self,terrain.scenery())
+ mesh(self,terrain.trails())
  for rock in Defs.ROCKS: mesh(self,terrain.rock(),Defs.point(Vector2(rock.x,rock.z)))
  market = mesh(self,art.station(),Vector3(4.2,0,6.3))
  markets.append(market)
