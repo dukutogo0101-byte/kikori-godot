@@ -69,9 +69,9 @@ func _ready() -> void:
   reset_callback = JavaScriptBridge.create_callback(_reset_input)
   document.addEventListener("visibilitychange",visibility_callback)
   window.addEventListener("kikori-input-reset",reset_callback)
- print("BOOT_STAGE _visibility([])")
+  print("BOOT_STAGE _visibility([])")
   _visibility([])
- print("BOOT_STAGE diagnostics()")
+  print("BOOT_STAGE diagnostics()")
   diagnostics()
  if native_smoke:
   print("KIKORI_ADVENTURE_READY trees=%d objects=%s" % [game.trees.size(),world.counts()])
