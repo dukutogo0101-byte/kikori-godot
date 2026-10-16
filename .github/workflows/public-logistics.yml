@@ -1,0 +1,28 @@
+name: Verify published roads and logistics
+on:
+  push:
+    branches: [verify/public-logistics]
+permissions:
+  contents: read
+jobs:
+  published-ui:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - run: |
+          pip install playwright==1.64.0
+          python3 -m playwright install --with-deps chromium
+      - name: Play linked delivery and touch road construction on public Pages
+        run: python3 tests/public_logistics.py
+        env:
+          PAGE_URL: https://dukutogo0101-byte.github.io/kikori-godot/?release=7258a6d
+          LIBGL_ALWAYS_SOFTWARE: '1'
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: public-logistics-ui-reports
+          path: reports/
