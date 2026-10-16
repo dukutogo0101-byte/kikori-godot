@@ -76,7 +76,7 @@ jobs:
           path: reports/
       - name: Install browser engine
         run: |
-          pip install playwright==1.56.0
+          pip install playwright==1.64.0
           python3 -m playwright install --with-deps "${{ matrix.engine }}"
       - name: Verify forty fresh WebKit startups
         if: matrix.engine == 'webkit'
@@ -149,7 +149,7 @@ jobs:
         run: curl --fail --retry 8 --retry-all-errors --retry-delay 5 "$PAGE_URL"
       - name: Install browser engines
         run: |
-          pip install playwright==1.56.0
+          pip install playwright==1.64.0
           python3 -m playwright install --with-deps chromium webkit
       - name: Verify public URL in Chrome and Safari engines
         env:

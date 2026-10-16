@@ -94,7 +94,7 @@ godot --headless --path . --script tests/test_automation.gd
 godot --headless --path . --script tests/test_logistics.gd
 godot --headless --path . --script tests/test_scene.gd -- --smoke-test
 node tests/test_web_guard.cjs
-pip install playwright==1.56.0
+pip install playwright==1.64.0
 python3 -m playwright install --with-deps chromium webkit
 python3 tests/browser_smoke.py --engine chromium --full
 python3 tests/browser_expansion.py
