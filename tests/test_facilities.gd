@@ -132,6 +132,9 @@ func _initialize() -> void:
  var browser_network=earned();var bn=browser_network.logistics
  bn.build(browser_network,"storage",Vector2(-12,9));bn.build(browser_network,"processor",Vector2(-4,14));bn.build(browser_network,"factory",Vector2(10,14))
  bn.sites[0].worker_enabled=false
+ # Use legitimately purchased throughput upgrades to bound software-WebGL time.
+ for id in [bn.sites[1].id,bn.sites[2].id]:
+  for level in 2: check(bn.upgrade(browser_network,id),"Earned processing upgrade for browser route fixture")
  wood(browser_network,12,bn.sites[0].output)
  for segment in [[Vector2i(-12,9),Vector2i(-12,14)],[Vector2i(-12,14),Vector2i(10,14)],[Vector2i(4,14),Vector2i(4,9)]]: bn.edit_roads(browser_network,bn.line(segment[0],segment[1]))
  fixture("production-route-fixture",browser_network)

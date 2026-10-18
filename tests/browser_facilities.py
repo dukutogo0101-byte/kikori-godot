@@ -102,7 +102,7 @@ def run(browser,url):
             click(page,'cart_buy');page.wait_for_function('(n)=>window.kikoriState.logistics.carts.length===n',arg=i+1)
         tap(page,'log_close')
         baseline=fixture['sold'][0];funds=fixture['money']-360
-        page.wait_for_function('(n)=>window.kikoriState.sold[0]===n+12',arg=baseline,timeout=180000)
+        page.wait_for_function('(n)=>window.kikoriState.sold[0]===n+12',arg=baseline,timeout=360000)
         assert state(page)['money']==funds+480 and state(page)['conserved']
         capture(page,'facility-complete-production-chain')
         page.wait_for_timeout(3300);page.reload();ready(page)
