@@ -52,17 +52,27 @@ func setup(state, view) -> void:
  ghost=Node3D.new();add_child(ghost)
  for kind in ["storage","processor","factory"]: ghost_shapes.append(world.mesh(ghost,art.facility(kind),Vector3(0,0,-2.7)))
  ghost_ring=world.mesh(ghost,art.ring(1.0,0.15,Color("f1bf61")))
+ # Shared meshes and a fixed visual bundle count keep 2,048-unit trucks cheap.
+ var human_mesh=art.hero_body();var hand_mesh=art.cart()
+ var horse_mesh=art.horse_wagon();var truck_mesh=art.truck()
+ var leg_mesh=art.hero_leg();var horse_leg_mesh=art.horse_leg()
  for i in Logic.MAX_CARTS:
   var root=Node3D.new();add_child(root)
-  world.mesh(root,art.hero_body()).scale=Vector3.ONE*0.85
-  world.mesh(root,art.cart())
+  var shapes=[]
+  var human=Node3D.new();root.add_child(human)
+  world.mesh(human,human_mesh).scale=Vector3.ONE*0.85
+  world.mesh(human,hand_mesh);shapes.append(human)
+  shapes.append(world.mesh(root,horse_mesh));shapes.append(world.mesh(root,truck_mesh))
   var legs=[]
-  for x in [-0.14,0.14]: legs.append(world.mesh(root,art.hero_leg(),Vector3(x,0.6,0)))
+  for x in [-0.14,0.14]: legs.append(world.mesh(human,leg_mesh,Vector3(x,0.6,0)))
+  var horse_legs=[]
+  for x in [-0.2,0.2]:
+   for z in [0.42,1.02]: horse_legs.append(world.mesh(root,horse_leg_mesh,Vector3(x,0.6,z)))
   var batches=[]
   for stage in 3:
-   for kind in 3: batches.append(world.batch(root,art.goods(kind,stage),16))
+   for kind in 3: batches.append(world.batch(root,art.goods(kind,stage),24))
   var label=world.label(root,"",Vector3(0,2.25,0),Color("346f94"),35)
-  carts.append({"root":root,"legs":legs,"cargo":batches,"label":label,"previous":Vector3.ZERO})
+  carts.append({"root":root,"shapes":shapes,"legs":legs,"horse_legs":horse_legs,"cargo":batches,"label":label,"previous":Vector3.ZERO})
  update(0)
 
 func update(delta: float) -> void:
@@ -86,18 +96,19 @@ func update(delta: float) -> void:
   preview_batch.multimesh.visible_instance_count=counts[0];invalid_preview_batch.multimesh.visible_instance_count=counts[1]
   preview_batch.material_override=preview_materials[0];invalid_preview_batch.material_override=preview_materials[1]
  var signature=str(revision)
- for cart in logistics.carts: signature+=cart.source+":"+cart.destination+";"
+ for cart in logistics.carts: signature+=str(cart.orders)+";"
  if signature!=route_key:
   route_key=signature
   var count=0
   for cart in logistics.carts:
-   var a=logistics.endpoint(game,cart.source);var b=logistics.endpoint(game,cart.destination)
-   if a.is_empty() or b.is_empty(): continue
-   var path=logistics.path_between(game,Logic.cell(a.position),Logic.cell(b.position))
-   for i in range(0,maxi(0,path.size()-1),3):
-    if count>=512: break
-    var difference=Vector2(path[i+1]-path[i]);var point=Vector2(path[i])+difference*0.4
-    arrows.multimesh.set_instance_transform(count,Transform3D(Basis(Vector3.UP,atan2(difference.x,difference.y)),Defs.point(point,0.09)));count+=1
+   for order in cart.orders:
+    var a=logistics.endpoint(game,order.source);var b=logistics.endpoint(game,order.destination)
+    if a.is_empty() or b.is_empty(): continue
+    var path=logistics.path_between(game,Logic.cell(a.position),Logic.cell(b.position))
+    for i in range(0,maxi(0,path.size()-1),3):
+     if count>=512: break
+     var difference=Vector2(path[i+1]-path[i]);var point=Vector2(path[i])+difference*0.4
+     arrows.multimesh.set_instance_transform(count,Transform3D(Basis(Vector3.UP,atan2(difference.x,difference.y)),Defs.point(point,0.09)));count+=1
   arrows.multimesh.visible_instance_count=count
  arrows.visible=world.planning or world.show_routes
  ghost.visible=not world.facility_preview.is_empty()
@@ -148,12 +159,16 @@ func update(delta: float) -> void:
   node.previous=at;node.root.position=at
   var gait=sin(world.clock*10+i)*0.5 if difference.length()>0.001 else 0.0
   node.legs[0].rotation.x=gait;node.legs[1].rotation.x=-gait
-  node.label.text="%d · %d本" % [cart.id,cart.cargo.size()]
+  for tier in 3: node.shapes[tier].visible=cart.tier==tier
+  for j in node.horse_legs.size():
+   node.horse_legs[j].visible=cart.tier==1
+   node.horse_legs[j].rotation.x=gait*(1 if j in [0,3] else -1)
+  node.label.text="%s%d · %d本" % [Logic.VEHICLES[cart.tier].name,cart.id,cart.cargo.size()]
   var counts=[0,0,0,0,0,0,0,0,0]
-  for j in cart.cargo.size():
+  for j in mini(24,cart.cargo.size()):
    var log=cart.cargo[j]
-   var p=Vector3(0,0.6+floori(float(j)/4)*0.2,-0.8-(j%4)*0.25)
+   var p=Vector3(-0.28+(j%3)*0.28,(0.64 if cart.tier==0 else 0.8)+floori(float(j)/12)*0.25,-0.35-(floori(float(j)/3)%4)*0.3)
    var material_index=log.kind+3*int(log.get("stage",0))
-   node.cargo[material_index].multimesh.set_instance_transform(counts[material_index],Transform3D(Basis(Vector3.UP,PI/2).scaled(Vector3.ONE*0.6),p))
+   node.cargo[material_index].multimesh.set_instance_transform(counts[material_index],Transform3D(Basis(Vector3.UP,PI/2).scaled(Vector3.ONE*0.45),p))
    counts[material_index]+=1
   for kind in 9: node.cargo[kind].multimesh.visible_instance_count=counts[kind]

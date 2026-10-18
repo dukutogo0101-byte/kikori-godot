@@ -13,7 +13,7 @@ from browser_smoke import ready,state,tap,KEY
 
 def snap(page,name): page.screenshot(path=f'reports/logistics-{name}.png')
 def bring(page,key):
- for _ in range(14):
+ for _ in range(40):
   ui=page.evaluate('window.kikoriUi');y=ui[key]['y']
   if 165<y<710: return
   page.mouse.move(185,530);page.mouse.wheel(0,240 if y>=710 else -240);page.wait_for_timeout(300)

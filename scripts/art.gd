@@ -340,6 +340,51 @@ func cart() -> ArrayMesh:
  for x in [-0.3,0.3]: box(Vector3(x,0.4,0.0),Vector3(0.07,0.07,0.65),WOOD)
  return finish()
 
+func horse_wagon() -> ArrayMesh:
+ begin("horse_wagon")
+ var chestnut=Color("965b3c")
+ box(Vector3(0,0.43,-0.9),Vector3(1.12,0.16,1.6),CUT)
+ for x in [-0.56,0.56]:
+  box(Vector3(x,0.7,-0.9),Vector3(0.08,0.52,1.7),WOOD)
+  box(Vector3(x*0.7,0.55,0.24),Vector3(0.06,0.06,1.2),WOOD)
+  for z in [-1.45,-0.4]: branch(Vector3(x-0.07,0.3,z),Vector3(x+0.07,0.3,z),0.28,0.28,DARK,10)
+ box(Vector3(0,1.0,0.72),Vector3(0.55,0.53,0.95),chestnut)
+ branch(Vector3(0,1.05,0.97),Vector3(0,1.58,1.13),0.23,0.18,chestnut,7)
+ box(Vector3(0,1.55,1.3),Vector3(0.29,0.3,0.55),chestnut)
+ for x in [-0.1,0.1]:
+  box(Vector3(x,1.82,1.14),Vector3(0.08,0.23,0.12),chestnut.darkened(0.2))
+  box(Vector3(x*1.6,1.59,1.38),Vector3(0.03,0.05,0.06),DARK)
+ box(Vector3(0,1.4,0.97),Vector3(0.12,0.45,0.22),DARK)
+ box(Vector3(0,0.99,0.65),Vector3(0.57,0.56,0.12),DARK)
+ branch(Vector3(0,1.1,0.26),Vector3(0,0.75,0.07),0.07,0.04,DARK)
+ # Driver sits on the front board, with a small cap.
+ box(Vector3(0,1.05,-0.1),Vector3(0.28,0.42,0.25),TEAL)
+ box(Vector3(0,1.4,-0.06),Vector3(0.24,0.24,0.24),CREAM)
+ box(Vector3(0,1.55,-0.04),Vector3(0.29,0.1,0.28),ROOF)
+ return finish()
+
+func horse_leg() -> ArrayMesh:
+ begin("horse_leg")
+ box(Vector3(0,-0.25,0),Vector3(0.12,0.56,0.14),Color("965b3c"))
+ box(Vector3(0,-0.53,0.03),Vector3(0.14,0.12,0.2),DARK)
+ return finish()
+
+func truck() -> ArrayMesh:
+ begin("truck")
+ box(Vector3(0,0.46,-0.25),Vector3(1.18,0.2,2.8),DARK)
+ box(Vector3(0,0.65,-0.8),Vector3(1.16,0.15,1.7),Color("a6b8b9"))
+ for x in [-0.58,0.58]:
+  box(Vector3(x,0.92,-0.8),Vector3(0.08,0.5,1.75),Color("588e9a"))
+  for z in [-1.3,0.7]: branch(Vector3(x-0.09,0.3,z),Vector3(x+0.09,0.3,z),0.3,0.3,DARK,12)
+ box(Vector3(0,0.94,0.75),Vector3(1.13,0.96,1.02),Color("d6a54d"))
+ box(Vector3(0,1.5,0.63),Vector3(1.18,0.12,1.08),Color("e9bd65"))
+ box(Vector3(0,1.22,1.27),Vector3(0.92,0.42,0.03),Color("9bc6d2"))
+ for x in [-0.575,0.575]: box(Vector3(x,1.22,0.76),Vector3(0.025,0.4,0.59),Color("9bc6d2"))
+ box(Vector3(0,0.66,1.3),Vector3(0.55,0.22,0.04),DARK)
+ for x in [-0.4,0.4]: box(Vector3(x,0.72,1.31),Vector3(0.2,0.16,0.06),CREAM)
+ box(Vector3(0,0.43,1.34),Vector3(1.18,0.12,0.12),Color("a6b8b9"))
+ return finish()
+
 func sawmill() -> ArrayMesh:
  var key="sawmill"
  if OS.has_feature("web"): return cached(key)

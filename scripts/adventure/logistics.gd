@@ -3,7 +3,13 @@ extends RefCounted
 const Defs = preload("res://scripts/adventure/definitions.gd")
 const ROAD_PRICE = 2
 const MAX_ROADS = 1200
-const MAX_CARTS = 6
+const MAX_CARTS = 18
+const MAX_ORDERS = 3
+const VEHICLES = [
+ {"name":"人力","capacity":8,"capacity_step":4,"speed":3.3,"speed_step":0.5,"upgrade":90,"promotion":6000},
+ {"name":"馬車","capacity":128,"capacity_step":32,"speed":12.0,"speed_step":1.5,"upgrade":1800,"promotion":80000},
+ {"name":"トラック","capacity":1024,"capacity_step":256,"speed":36.0,"speed_step":4.0,"upgrade":20000,"promotion":0}
+]
 const MAX_NETWORK = 2400
 const LEGACY_DEPOTS = [Vector2(0,13),Vector2(0,-66),Vector2(6,-157)]
 const DIRS = [Vector2i.RIGHT,Vector2i.DOWN,Vector2i.LEFT,Vector2i.UP]
@@ -208,10 +214,17 @@ func used_cells(game) -> Dictionary:
  for cart in carts:
   used[cell(cart.position)]=true
   for p in cart.path: used[p]=true
-  if not cart.source.is_empty():
-   var source=endpoint(game,cart.source);var dest=endpoint(game,cart.destination)
-   if not source.is_empty() and not dest.is_empty():
-    for p in path_between(game,cell(source.position),cell(dest.position)): used[p]=true
+  var orders=cart.get("orders",[])
+  for i in orders.size():
+   var order=orders[i]
+   var source=endpoint(game,order.source);var dest=endpoint(game,order.destination)
+   var next=endpoint(game,orders[(i+1)%orders.size()].source)
+   for pair in [[source,dest],[dest,next]]:
+    if not pair[0].is_empty() and not pair[1].is_empty():
+     for p in path_between(game,cell(pair[0].position),cell(pair[1].position)): used[p]=true
+  if not orders.is_empty():
+   var first=endpoint(game,cart.source)
+   for p in path_between(game,cell(cart.position),cell(first.position)): used[p]=true
  return used
 
 func edit_roads(game, cells: Array, remove: bool = false) -> bool:
@@ -260,72 +273,144 @@ func blocks_regrowth(at: Vector2) -> bool:
    if (roads.has(p) or natural_roads.has(p)) and Vector2(p).distance_to(at)<1.4: return true
  return false
 
+func cart_limit(_game = null) -> int:
+ # Central base counts as one building, in addition to all placed facilities.
+ return sites.size()+2
+
 func cart_price() -> int:
  return 120
 
 func cart_capacity(cart: Dictionary) -> int:
- return 4+cart.level*4
+ var spec=VEHICLES[int(cart.get("tier",0))]
+ return int(spec.capacity+spec.capacity_step*(cart.level-1))
+
+func cart_speed(cart: Dictionary) -> float:
+ var spec=VEHICLES[int(cart.get("tier",0))]
+ return spec.speed+spec.speed_step*(cart.level-1)
+
+func cart_name(cart: Dictionary) -> String:
+ return "%s%d Lv.%d / 5" % [VEHICLES[int(cart.get("tier",0))].name,cart.id,cart.level]
+
+func cart_maxed(cart: Dictionary) -> bool:
+ return cart.get("tier",0)==2 and cart.level==5
 
 func upgrade_price(cart: Dictionary, level: int = -1) -> int:
- return int(round(90*pow(2,cart.level-1 if level<0 else level-1)))
+ var current=cart.level if level<0 else level
+ var spec=VEHICLES[int(cart.get("tier",0))]
+ return int(spec.promotion) if current==5 else int(spec.upgrade)*int(pow(2,current-1))
+
+func cart_investment(cart: Dictionary) -> int:
+ var result=cart_price()
+ var tier=int(cart.get("tier",0))
+ for previous in range(tier+1):
+  var spec=VEHICLES[previous]
+  var levels=5 if previous<tier else int(cart.level)
+  for level in range(1,levels): result+=int(spec.upgrade)*int(pow(2,level-1))
+  if previous<tier: result+=int(spec.promotion)
+ return result
 
 func route_ok(game, source: String, destination: String) -> bool:
  var a=endpoint(game,source);var b=endpoint(game,destination)
- if a.is_empty() or b.is_empty() or source==destination or a.type=="market" :
+ if a.is_empty() or b.is_empty() or source==destination or a.type=="market":
   message="設備から、別の設備か中央基地を選んでください";return false
  if path_between(game,cell(a.position),cell(b.position)).is_empty():
   message="出発地と目的地の円の中心まで道路をつなごう";return false
  return true
 
+func orders_ok(game, orders: Array) -> bool:
+ if orders.is_empty() or orders.size()>MAX_ORDERS: message="運送命令は1台につき1〜3件です";return false
+ for order in orders:
+  if not order is Dictionary or not order.get("source") is String or not order.get("destination") is String: return false
+  if not route_ok(game,order.source,order.destination): return false
+ for i in orders.size():
+  var a=endpoint(game,orders[i].destination);var b=endpoint(game,orders[(i+1)%orders.size()].source)
+  if path_between(game,cell(a.position),cell(b.position)).is_empty():
+   message="次の命令の出発地まで、空荷で移動できる道が必要です";return false
+ return true
+
 func add_cart(game, source: String, destination: String) -> bool:
- if carts.size()>=MAX_CARTS: message="荷車は6台までです";return false
- if game.money<cart_price(): message="荷車の購入資金が足りません";return false
+ if carts.size()>=cart_limit(): message="輸送車の上限は全建物数＋1台（現在%d台）です" % cart_limit();return false
+ if game.money<cart_price(): message="輸送車の購入資金が足りません";return false
  if not route_ok(game,source,destination): return false
  var a=endpoint(game,source)
  game.money-=cart_price()
- carts.append({"id":carts.size()+1,"level":1,"source":source,"destination":destination,"position":a.position,"cargo":[],"phase":"loading","pause_requested":false,"path":[],"cursor":0,"clock":0.0,"status":"積み込み待ち"})
- message="荷車%dが運行を開始！" % carts.size()
+ carts.append({"id":carts.size()+1,"tier":0,"level":1,"orders":[{"source":source,"destination":destination}],"order_index":0,"source":source,"destination":destination,"position":a.position,"cargo":[],"phase":"loading","pause_requested":false,"path":[],"cursor":0,"clock":0.0,"status":"積み込み待ち"})
+ message="人力の輸送車%dが運行を開始！" % carts.size()
  return true
 
 func upgrade_cart(game, index: int) -> bool:
  if index<0 or index>=carts.size(): return false
  var cart=carts[index]
- if cart.level>=3 or game.money<upgrade_price(cart): return false
- game.money-=upgrade_price(cart);cart.level+=1
- message="荷車%dを強化！ 積載%d本" % [cart.id,cart_capacity(cart)]
+ if cart_maxed(cart): message="トラックは最高レベルです";return false
+ var cost=upgrade_price(cart)
+ if game.money<cost: message="輸送車の強化資金が足りません";return false
+ game.money-=cost
+ if cart.level==5: cart.tier+=1;cart.level=1
+ else: cart.level+=1
+ message="%s！ 積載%d本・速度%.1f" % [cart_name(cart),cart_capacity(cart),cart_speed(cart)]
  return true
 
 func toggle_pause(index: int) -> bool:
  if index<0 or index>=carts.size(): return false
  var cart=carts[index]
- if cart.source.is_empty(): message="先にルートを設定してください";return false
+ if cart.source.is_empty(): message="先に運送命令を設定してください";return false
  cart.pause_requested=not cart.pause_requested
  if not cart.pause_requested and cart.phase=="parked": cart.phase="returning"
  message="配送を終えてから休止します" if cart.pause_requested else "運行を再開します"
  return true
 
-func set_route(game, index: int, source: String, destination: String) -> bool:
+func can_edit_orders(cart: Dictionary) -> bool:
+ return cart.cargo.is_empty() and cart.phase in ["loading","parked"]
+
+func set_orders(game, index: int, orders: Array) -> bool:
  if index<0 or index>=carts.size(): return false
  var cart=carts[index]
- if not cart.cargo.is_empty() or cart.phase not in ["loading","parked"]:
-  message="ルート変更は、荷物を届けて休止してから行えます";return false
- if not route_ok(game,source,destination): return false
- var a=endpoint(game,source)
- var path=path_between(game,cell(cart.position),cell(a.position))
- if path.is_empty(): message="荷車のいる場所から新しい出発地まで道をつなごう";return false
- cart.source=source;cart.destination=destination;cart.pause_requested=false
- cart.path=[];cart.cursor=0;cart.clock=0.0;cart.phase="returning"
- message="荷車%dのルートを変更しました" % cart.id
+ if not can_edit_orders(cart): message="命令の変更は、荷物を届けて休止してから行えます";return false
+ if not orders_ok(game,orders): return false
+ var a=endpoint(game,orders[0].source)
+ if path_between(game,cell(cart.position),cell(a.position)).is_empty():
+  message="輸送車のいる場所から最初の出発地まで道をつなごう";return false
+ # Commit only after every loaded and empty leg has been validated.
+ cart.orders=orders.duplicate(true);cart.order_index=0
+ cart.source=orders[0].source;cart.destination=orders[0].destination;cart.pause_requested=true
+ cart.path=[];cart.cursor=0;cart.clock=0.0;cart.phase="parked"
+ message="輸送車%dの運送命令を%d件に設定。再開で運行します" % [cart.id,orders.size()]
  return true
+
+func set_route(game, index: int, source: String, destination: String) -> bool:
+ return set_orders(game,index,[{"source":source,"destination":destination}])
+
+func edit_order(game, index: int, slot: int, source: String, destination: String) -> bool:
+ if index<0 or index>=carts.size(): return false
+ var orders=carts[index].orders.duplicate(true)
+ if slot<0 or slot>orders.size() or slot>=MAX_ORDERS: message="運送命令は最大3件です";return false
+ var order={"source":source,"destination":destination}
+ if slot==orders.size(): orders.append(order)
+ else: orders[slot]=order
+ return set_orders(game,index,orders)
+
+func remove_order(game, index: int, slot: int) -> bool:
+ if index<0 or index>=carts.size(): return false
+ var orders=carts[index].orders.duplicate(true)
+ if slot<0 or slot>=orders.size(): return false
+ if orders.size()==1: return clear_route(index)
+ orders.remove_at(slot)
+ return set_orders(game,index,orders)
 
 func clear_route(index: int) -> bool:
  if index<0 or index>=carts.size(): return false
  var cart=carts[index]
- if not cart.cargo.is_empty() or cart.phase not in ["loading","parked"]:
-  message="配送を終えて休止してから解除してください";return false
- cart.source="";cart.destination="";cart.phase="parked";cart.pause_requested=true;cart.path=[];cart.cursor=0
- message="ルートを解除。荷車はその場で待機します"
+ if not can_edit_orders(cart): message="配送を終えて休止してから解除してください";return false
+ cart.orders=[];cart.order_index=0;cart.source="";cart.destination="";cart.phase="parked";cart.pause_requested=true;cart.path=[];cart.cursor=0;cart.clock=0.0
+ message="運送命令を解除。輸送車はその場で待機します"
  return true
+
+func next_order(cart: Dictionary) -> void:
+ cart.order_index=(int(cart.order_index)+1)%cart.orders.size()
+ var order=cart.orders[cart.order_index]
+ cart.source=order.source;cart.destination=order.destination
+ cart.clock=0.0;cart.path=[];cart.cursor=0
+ cart.phase="parked" if cart.pause_requested else "returning"
 
 func begin_leg(game, cart: Dictionary, goal: Vector2, phase: String) -> bool:
  cart.path=path_between(game,cell(cart.position),cell(goal));cart.cursor=1
@@ -335,7 +420,7 @@ func begin_leg(game, cart: Dictionary, goal: Vector2, phase: String) -> bool:
  return false
 
 func advance(cart: Dictionary, dt: float) -> bool:
- var remaining=(2.8+cart.level*0.5)*dt
+ var remaining=cart_speed(cart)*dt
  while cart.cursor<cart.path.size() and remaining>0:
   var goal=Vector2(cart.path[cart.cursor]);var distance=cart.position.distance_to(goal)
   if distance<=remaining:
@@ -348,7 +433,7 @@ func advance(cart: Dictionary, dt: float) -> bool:
 func tick(game, dt: float) -> void:
  tick_production(game,dt)
  for cart in carts:
-  if cart.source.is_empty(): cart.status="ルート未設定";continue
+  if cart.source.is_empty(): cart.status="命令未設定";continue
   var a=endpoint(game,cart.source);var b=endpoint(game,cart.destination)
   if a.is_empty() or b.is_empty(): cart.status="施設を確認してください";continue
   if cart.phase=="parked": cart.status="休止中";continue
@@ -358,7 +443,7 @@ func tick(game, dt: float) -> void:
     if not begin_leg(game,cart,a.position,"to_source"): continue
     cart.phase="loading"
   if cart.phase=="to_source":
-   cart.status="出発地へ移動中"
+   cart.status="次の出発地へ移動中"
    if not advance(cart,dt): continue
    cart.phase="loading"
   if cart.phase=="loading":
@@ -369,7 +454,12 @@ func tick(game, dt: float) -> void:
    for log in source:
     if accepts(b.id,log): eligible.append(log)
    var amount=mini(eligible.size(),mini(cart_capacity(cart),room))
-   if amount<=0: cart.status="配送先の空き待ち" if room<=0 else "木材待ち";continue
+   if amount<=0:
+    cart.status="配送先の空き待ち" if room<=0 else "木材待ち"
+    if cart.orders.size()>1:
+     cart.clock=minf(1.0,cart.clock+dt)
+     if cart.clock>=1.0: next_order(cart)
+    continue
    var path=path_between(game,cell(cart.position),cell(b.position))
    if path.is_empty(): cart.status="道がつながっていません";continue
    # Reservation becomes visible to every later cart in this same tick.
@@ -383,14 +473,16 @@ func tick(game, dt: float) -> void:
   if cart.phase=="unloading":
    cart.status="荷下ろし中"
    cart.clock+=dt
-   while cart.clock>=0.105 and not cart.cargo.is_empty():
-    if b.type!="market" and free_space(b.id,cart.id)<=0: cart.status="配送先の空き待ち";cart.clock=minf(cart.clock,0.105);break
-    cart.clock-=0.105
+   # Large vehicles unload in bulk at the same bundle rate, so promotion also
+   # improves real throughput instead of spending minutes unloading a truck.
+   var interval=0.105/(1 if cart.tier==0 else (8 if cart.tier==1 else 32))
+   while cart.clock>=interval and not cart.cargo.is_empty():
+    if b.type!="market" and free_space(b.id,cart.id)<=0: cart.status="配送先の空き待ち";cart.clock=minf(cart.clock,interval);break
+    cart.clock-=interval
     var log=cart.cargo.pop_front()
     if b.type!="market": incoming(b.id).append(log)
     else: game.sell_log(log,b.position,true)
-   if cart.cargo.is_empty():
-    cart.clock=0.0;cart.phase="parked" if cart.pause_requested else "returning"
+   if cart.cargo.is_empty(): next_order(cart)
 
 func player_transfer(game, id: String, dt: float) -> void:
  var item=site(id)
@@ -423,8 +515,7 @@ func held(kind: int) -> int:
 func costs() -> int:
  var total=road_paid*ROAD_PRICE+carts.size()*cart_price()
  for item in sites: total+=item.paid
- for cart in carts:
-  for level in range(1,cart.level): total+=upgrade_price(cart,level)
+ for cart in carts: total+=cart_investment(cart)-cart_price()
  return total
 
 func invalidate_navigation() -> void:
@@ -566,7 +657,7 @@ func restore_path(game, raw, out: Array, road_only: bool = false) -> bool:
   out.append(p)
  return true
 
-func restore(game, data, ids: Dictionary, total: int) -> bool:
+func restore(game, data, ids: Dictionary, total: int, legacy: bool = false) -> bool:
  if not data is Dictionary or not data.get("sites") is Array or data.sites.size()>MAX_SITES: return false
  if not game.number(data.get("next_site"),1,1e6,true): return false
  next_site=int(data.next_site)
@@ -642,13 +733,25 @@ func restore(game, data, ids: Dictionary, total: int) -> bool:
   var p=Vector2i(int(pair[0]),int(pair[1]))
   if roads.has(p) or not road_valid(game,p): return false
   roads[p]=true
- if not data.get("carts") is Array or data.carts.size()>MAX_CARTS: return false
+ if not data.get("carts") is Array or data.carts.size()>(6 if legacy else maxi(cart_limit(),6)): return false
  for raw in data.carts:
-  if not raw is Dictionary or not game.number(raw.get("id"),carts.size()+1,carts.size()+1,true) or not game.number(raw.get("level"),1,3,true): return false
+  if not raw is Dictionary or not game.number(raw.get("id"),carts.size()+1,carts.size()+1,true) or not game.number(raw.get("level"),1,3 if legacy else 5,true): return false
+  if not legacy and not game.number(raw.get("tier"),0,2,true): return false
   if not raw.get("source") is String or not raw.get("destination") is String or not raw.get("pause_requested") is bool: return false
-  if not game.pair(raw.get("position")) or not game.number(raw.get("clock"),0,0.21): return false
+  if not game.pair(raw.get("position")) or not game.number(raw.get("clock"),0,0.21 if legacy else 1.0): return false
   if raw.get("phase") not in ["loading","to_source","returning","to_destination","unloading","parked"]: return false
-  var copy={"id":int(raw.id),"level":int(raw.level),"source":raw.source,"destination":raw.destination,"position":Vector2(raw.position[0],raw.position[1]),"pause_requested":raw.pause_requested,"clock":float(raw.clock),"phase":raw.phase,"path":[],"cursor":0,"cargo":[],"status":"再開"}
+  var copy={"id":int(raw.id),"tier":0 if legacy else int(raw.tier),"level":int(raw.level),"orders":[],"order_index":0,"source":raw.source,"destination":raw.destination,"position":Vector2(raw.position[0],raw.position[1]),"pause_requested":raw.pause_requested,"clock":float(raw.clock),"phase":raw.phase,"path":[],"cursor":0,"cargo":[],"status":"再開"}
+  if legacy:
+   if not copy.source.is_empty(): copy.orders=[{"source":copy.source,"destination":copy.destination}]
+  else:
+   if not raw.get("orders") is Array or raw.orders.size()>MAX_ORDERS or not game.number(raw.get("order_index"),0,maxi(0,raw.orders.size()-1),true): return false
+   copy.orders=raw.orders.duplicate(true);copy.order_index=int(raw.order_index)
+   if copy.orders.is_empty():
+    if not copy.source.is_empty() or not copy.destination.is_empty(): return false
+   else:
+    if not orders_ok(game,copy.orders): return false
+    var active=copy.orders[copy.order_index]
+    if copy.source!=active.source or copy.destination!=active.destination: return false
   if not restore_logs(game,raw.get("cargo"),copy.cargo,cart_capacity(copy),ids,total): return false
   if not raw.get("path") is Array or raw.path.size()>MAX_NETWORK or not game.number(raw.get("cursor"),0,raw.path.size(),true): return false
   for pair in raw.path:

@@ -293,7 +293,7 @@ func conserved() -> bool:
  return true
 
 func snapshot() -> Dictionary:
- var state = {"version": 7, "migration_credit":migration_credit, "logistics": logistics.snapshot(), "wide_view": wide_view, "position": [position.x, position.y], "facing": [facing.x, facing.y], "money": money, "levels": levels.duplicate(), "projects": projects.duplicate(), "created": created.duplicate(), "sold": sold.duplicate(), "spent": spent.duplicate(), "next_id": next_id, "elapsed": elapsed, "timings": [first_cut,first_sale,first_upgrade,bridge_time], "trees": [], "ground": [], "bag": bag.duplicate(true)}
+ var state = {"version": 8, "migration_credit":migration_credit, "logistics": logistics.snapshot(), "wide_view": wide_view, "position": [position.x, position.y], "facing": [facing.x, facing.y], "money": money, "levels": levels.duplicate(), "projects": projects.duplicate(), "created": created.duplicate(), "sold": sold.duplicate(), "spent": spent.duplicate(), "next_id": next_id, "elapsed": elapsed, "timings": [first_cut,first_sale,first_upgrade,bridge_time], "trees": [], "ground": [], "bag": bag.duplicate(true)}
  for tree in trees:
   state.trees.append({"hp": tree.hp, "regrow": tree.regrow, "fall": tree.fall, "cycle": tree.cycle})
  for log in ground:
@@ -309,7 +309,7 @@ static func pair(v) -> bool:
 func restore(data: Dictionary) -> bool:
  # Build a candidate: failures leave this game completely unchanged.
  if data.get("version")==5 or data.get("version")==6: return migrate(data)
- if data.get("version")!=7: return false
+ if data.get("version")!=7 and data.get("version")!=8: return false
  var candidate = get_script().new()
  for key in ["position","facing"]:
   if not pair(data.get(key)): return false
@@ -377,7 +377,7 @@ func restore(data: Dictionary) -> bool:
    candidate.get(group).append(restored)
  if not data.get("wide_view") is bool: return false
  candidate.wide_view=data.wide_view
- if not candidate.logistics.restore(candidate,data.get("logistics"),ids,total): return false
+ if not candidate.logistics.restore(candidate,data.get("logistics"),ids,total,data.get("version")==7): return false
  if not candidate.conserved(): return false
  if not data.get("timings") is Array or data.timings.size() != 4: return false
  for v in data.timings:

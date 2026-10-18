@@ -45,25 +45,35 @@ func setup(state, owner_ui) -> void:
   var build=ui.button("%sを配置 · %d" % [game.logistics.FACILITIES[kind].name,game.logistics.price(kind)])
   build.pressed.connect(func():action.emit("place",kind));body.add_child(build);build_buttons[kind]=build
  info=ui.text("",14);info.autowrap_mode=TextServer.AUTOWRAP_WORD_SMART;body.add_child(info)
- body.add_child(ui.text("荷車のルート",20))
+ body.add_child(ui.text("輸送車の運送命令",20))
  source=option();destination=option();body.add_child(source);body.add_child(destination)
  source.item_selected.connect(func(index):source_id=choices[index].id)
  destination.item_selected.connect(func(index):destination_id=choices[index].id)
  source_focus=ui.button("出発地を地図で見る・道を敷く")
  source_focus.pressed.connect(func():action.emit("focus",source_id));body.add_child(source_focus)
- purchase=ui.button("荷車を購入して運行  120")
+ purchase=ui.button("人力の輸送車を購入  120")
  purchase.pressed.connect(func():action.emit("cart",[source_id,destination_id]));body.add_child(purchase)
- for i in 6:
+ for i in game.logistics.MAX_CARTS:
   var panel=PanelContainer.new();panel.add_theme_stylebox_override("panel",ui.style(Color("dce9e5"),14));body.add_child(panel)
   var col=VBoxContainer.new();panel.add_child(col)
   var label=ui.text("",14);label.autowrap_mode=TextServer.AUTOWRAP_WORD_SMART;col.add_child(label)
   var row=HBoxContainer.new();col.add_child(row)
   var pause=ui.button("休止");pause.pressed.connect(func():action.emit("pause",i));row.add_child(pause)
   var upgrade=ui.button("強化");upgrade.pressed.connect(func():action.emit("upgrade_cart",i));upgrade.size_flags_horizontal=Control.SIZE_EXPAND_FILL;row.add_child(upgrade)
-  var apply=ui.button("選択中のルートに変更");apply.pressed.connect(func():action.emit("route",[i,source_id,destination_id]));col.add_child(apply)
-  var clear=ui.button("ルートを解除");clear.pressed.connect(func():action.emit("clear",i));col.add_child(clear)
-  routes.append({"panel":panel,"label":label,"pause":pause,"upgrade":upgrade,"route":apply,"clear":clear})
- var note=ui.text("道路は1マス2、撤去時の払い戻しはありません。配送中の道は撤去できません。休止は荷物を届けてから。中間集積所の木こりは近くの木を伐採して納品します。",13);note.autowrap_mode=TextServer.AUTOWRAP_WORD_SMART;body.add_child(note)
+  var orders=[]
+  for slot in game.logistics.MAX_ORDERS:
+   var order_box=VBoxContainer.new();col.add_child(order_box)
+   var order_label=ui.text("",14);order_label.autowrap_mode=TextServer.AUTOWRAP_WORD_SMART;order_box.add_child(order_label)
+   var controls=HBoxContainer.new();order_box.add_child(controls)
+   var apply=ui.button("選択区間に変更");apply.size_flags_horizontal=Control.SIZE_EXPAND_FILL
+   apply.pressed.connect(func():action.emit("order",[i,slot,source_id,destination_id]));controls.add_child(apply)
+   var remove=ui.button("削除");remove.pressed.connect(func():action.emit("remove_order",[i,slot]));controls.add_child(remove)
+   orders.append({"box":order_box,"label":order_label,"apply":apply,"remove":remove})
+  var append=ui.button("選択区間を命令に追加")
+  append.pressed.connect(func():action.emit("order",[i,game.logistics.carts[i].orders.size(),source_id,destination_id]));col.add_child(append)
+  var clear=ui.button("全命令を解除");clear.pressed.connect(func():action.emit("clear",i));col.add_child(clear)
+  routes.append({"panel":panel,"label":label,"pause":pause,"upgrade":upgrade,"orders":orders,"append":append,"clear":clear})
+ var note=ui.text("1台に最大3件の命令を設定でき、上から順に繰り返します。区間の間は空荷で移動。木材なし・満杯の区間は次の周回で再確認します。命令の編集は荷物を届けて休止してから。設定後に「再開」で運行。人力・馬車・トラックの各Lv.5で次の車種へ更新できます。",13);note.autowrap_mode=TextServer.AUTOWRAP_WORD_SMART;body.add_child(note)
  refresh()
 
 func Defs_name(index: int) -> String:
@@ -89,29 +99,43 @@ func refresh() -> void:
   for i in choices.size():
    if choices[i].id==source_id: source.select(i)
    if choices[i].id==destination_id: destination.select(i)
- info.text="設備 %d / 16 棟 · 荷車 %d / 6 台\n新設道路 %d マス · 既存道と橋 %d マス\n加工所は丸太、工場は加工材のみ受け入れます。" % [logistics.sites.size(),logistics.carts.size(),logistics.roads.size(),logistics.public_roads(game).size()]
+ info.text="設備 %d / 16 棟 · 輸送車 %d / %d 台\n上限＝中央基地を含む全建物数＋1台\n新設道路 %d マス · 既存道と橋 %d マス\n加工所は丸太、工場は加工材のみ受け入れます。\n下の出発地・配送先を選び、各車の命令に追加・変更できます。" % [logistics.sites.size(),logistics.carts.size(),logistics.cart_limit(),logistics.roads.size(),logistics.public_roads(game).size()]
  for kind in build_buttons: build_buttons[kind].disabled=game.money<logistics.price(kind) or logistics.sites.size()>=16
- purchase.disabled=game.money<120 or logistics.carts.size()>=6 or source_id.is_empty()
+ purchase.disabled=game.money<120 or logistics.carts.size()>=logistics.cart_limit() or source_id.is_empty()
  for i in routes.size():
   var row=routes[i];row.panel.visible=i<logistics.carts.size()
   if i>=logistics.carts.size(): continue
   var cart=logistics.carts[i]
-  var a=logistics.endpoint(game,cart.source);var b=logistics.endpoint(game,cart.destination)
-  row.label.text="荷車%d Lv.%d / 3 · %s\n%s → %s\n荷物 %d / %d 本" % [cart.id,cart.level,cart.status,a.get("name","未設定"),b.get("name","未設定"),cart.cargo.size(),logistics.cart_capacity(cart)]
+  row.label.text="%s · %s\n荷物 %d / %d 本 · 速度 %.1f\n運送命令 %d / 3 件（繰り返し）" % [logistics.cart_name(cart),cart.status,cart.cargo.size(),logistics.cart_capacity(cart),logistics.cart_speed(cart),cart.orders.size()]
   row.pause.text="再開" if cart.pause_requested else "休止"
   row.pause.disabled=cart.source.is_empty()
-  row.upgrade.text="MAX" if cart.level>=3 else "強化 %d" % logistics.upgrade_price(cart)
-  row.upgrade.disabled=cart.level>=3 or game.money<logistics.upgrade_price(cart)
-  var can_change=cart.cargo.is_empty() and cart.phase in ["loading","parked"]
-  row.route.disabled=not can_change;row.clear.disabled=not can_change
+  var cost=logistics.upgrade_price(cart)
+  if logistics.cart_maxed(cart): row.upgrade.text="最高レベル"
+  elif cart.level==5: row.upgrade.text="%sへ更新 · %d" % [logistics.VEHICLES[cart.tier+1].name,cost]
+  else: row.upgrade.text="Lv.%dへ強化 · %d" % [cart.level+1,cost]
+  row.upgrade.disabled=logistics.cart_maxed(cart) or game.money<cost
+  var can_change=logistics.can_edit_orders(cart)
+  for slot in row.orders.size():
+   var command=row.orders[slot];command.box.visible=slot<cart.orders.size()
+   if slot>=cart.orders.size(): continue
+   var order=cart.orders[slot];var a=logistics.endpoint(game,order.source);var b=logistics.endpoint(game,order.destination)
+   command.label.text="%s 命令%d：%s → %s" % ["▶" if slot==cart.order_index else "",slot+1,a.get("name","未設定"),b.get("name","未設定")]
+   command.apply.disabled=not can_change;command.remove.disabled=not can_change
+  row.append.disabled=not can_change or cart.orders.size()>=3
+  row.clear.disabled=not can_change or cart.orders.is_empty()
 
 func summary() -> Dictionary:
- var result={"source_id":source_id,"destination_id":destination_id}
+ var result={"source_id":source_id,"destination_id":destination_id,"cart_limit":game.logistics.cart_limit()}
  var buttons={"road_editor":road_button,"log_close":close_button,"cart_buy":purchase,"route_source":source,"route_destination":destination,"source_focus":source_focus}
  for kind in build_buttons: buttons["build_"+kind]=build_buttons[kind]
  for i in routes.size():
   buttons["cart_pause%d" % i]=routes[i].pause
   buttons["cart_clear%d" % i]=routes[i].clear
+  buttons["cart_upgrade%d" % i]=routes[i].upgrade
+  buttons["cart_append%d" % i]=routes[i].append
+  for slot in routes[i].orders.size():
+   buttons["cart_order%d_%d" % [i,slot]]=routes[i].orders[slot].apply
+   buttons["cart_remove%d_%d" % [i,slot]]=routes[i].orders[slot].remove
  for key in buttons:
   var p=buttons[key].get_global_rect().get_center();result[key]={"x":p.x,"y":p.y}
  return result

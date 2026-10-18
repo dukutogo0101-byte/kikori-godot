@@ -56,7 +56,7 @@ func _ready() -> void:
  ui.vibration_changed.connect(func(on): feedback.vibration = on)
  get_viewport().size_changed.connect(controller.reset)
  if not store.message.is_empty(): ui.toast(store.message)
- elif restored: ui.toast("設備を新方式に移行。旧設備などの費用 %d を返金しました" % game.migrated_refund if data.get("version")!=7 else "おかえりなさい。続きの森へ！")
+ elif restored: ui.toast("設備を新方式に移行。旧設備などの費用 %d を返金しました" % game.migrated_refund if game.migrated_refund>0 else "おかえりなさい。続きの森へ！")
  else: ui.toast("ドラッグで歩こう。木のそばで止まると伐採")
  if OS.has_feature("web"):
   document = JavaScriptBridge.get_interface("document")
@@ -71,7 +71,7 @@ func _ready() -> void:
   window.addEventListener("kikori-web-modal-change",web_modal_callback)
   _visibility([])
   diagnostics()
- if restored and data.get("version")!=7: _save()
+ if restored and data.get("version")!=8: _save()
  if native_smoke:
   print("KIKORI_ADVENTURE_READY trees=%d objects=%s" % [game.trees.size(),world.counts()])
   get_tree().create_timer(2).timeout.connect(func(): get_tree().quit())
@@ -139,6 +139,8 @@ func _logistics_action(kind: String, value) -> void:
   "pause": ok=game.logistics.toggle_pause(int(value))
   "clear": ok=game.logistics.clear_route(int(value))
   "route": ok=game.logistics.set_route(game,int(value[0]),value[1],value[2])
+  "order": ok=game.logistics.edit_order(game,int(value[0]),int(value[1]),value[2],value[3])
+  "remove_order": ok=game.logistics.remove_order(game,int(value[0]),int(value[1]))
   "upgrade_cart": ok=game.logistics.upgrade_cart(game,int(value))
  if ok:
   purchase_lock_until=Time.get_ticks_msec()+250
