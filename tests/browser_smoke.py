@@ -74,8 +74,13 @@ def tap(page, key):
     ui = page.evaluate('window.kikoriUi')
     bounds = page.locator('#canvas').bounding_box()
     point = ui[key]
+    before_frame = state(page)['render']['process_frames']
     page.touchscreen.tap(bounds['x'] + point['x'] / ui['width'] * bounds['width'],
                          bounds['y'] + point['y'] / ui['height'] * bounds['height'])
+    # Software WebGL can take longer than a fixed sleep to publish the result.
+    # Wait for actual presentation/diagnostic frames; never tap twice to retry.
+    page.wait_for_function('(n) => window.kikoriState.render.process_frames >= n + 2',
+                           arg=before_frame, timeout=10000)
     page.wait_for_timeout(160)
 
 
