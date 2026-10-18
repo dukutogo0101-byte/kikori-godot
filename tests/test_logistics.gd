@@ -105,8 +105,9 @@ func _initialize() -> void:
  clone(game);advance(game,50)
  check(logistics.stocks[0].size()==48 and logistics.reserved(0)==0,"Reserved cargo arrives without overflow")
  check(game.conserved(),"Full destination neither loses nor duplicates goods")
+ create_logs(game,game.capacity()-game.bag.size()-1,game.bag)
  logistics.depot_mode="withdraw";advance(game,1)
- check(game.bag.size()==game.capacity(),"Warehouse withdrawal is bounded by pack capacity")
+ check(game.bag.size()==game.capacity() and game.conserved(),"Warehouse withdrawal fills only the last slot in the 128-log pack")
  game.position=Defs.SPAWN;advance(game,15);clone(game)
  # Cross a physically completed bridge and retain species/value at another depot.
  var cross=fresh();var consumed=[];create_logs(cross,60,consumed)

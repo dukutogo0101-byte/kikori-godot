@@ -7,6 +7,9 @@
   <meta name="description" content="中央基地から川向こうの丘陵と白樺の高原へ。木を切り、道を作り、遠方の良質材を基地まで届ける3D木こりゲーム。">
   <title>KIKORI — 流域を開拓する木こりゲーム</title>
   <link rel="icon" href="index.icon.png">
+  <link rel="manifest" href="manifest.webmanifest">
+  <link rel="apple-touch-icon" href="app-icon-192.png">
+  <meta name="apple-mobile-web-app-capable" content="yes">
   <style>
     :root { color-scheme: light; font-family: system-ui, sans-serif; background: #173f36; color: #f4f0db; }
     * { box-sizing: border-box; }
@@ -23,6 +26,13 @@
     progress::-webkit-progress-value { background: #f0c77b; border-radius: 6px; }
     #retry { border: 0; border-radius: 12px; padding: 14px 28px; color: #173f36; background: #f0c77b; font-size: 16px; cursor: pointer; }
     #loading[hidden], #retry[hidden] { display: none; }
+    #app-dialog { width: min(360px, calc(100vw - 32px)); max-height: calc(100dvh - 32px); overflow: auto; border: 0; border-radius: 20px; padding: 24px; color: #173f36; background: #f0f7fa; line-height: 1.7; }
+    #app-dialog::backdrop { background: #071e2b99; }
+    #app-dialog h2 { margin: 0 0 12px; font-size: 22px; }
+    #app-dialog button { display: block; width: 100%; min-height: 48px; padding: 10px; margin-top: 12px; border: 0; border-radius: 12px; background: #286a80; color: white; font: inherit; cursor: pointer; }
+    #app-dialog button[hidden] { display: none; }
+    #app-dialog button:disabled { opacity: .65; }
+    #app-status { font-size: 13px; color: #526b6c; }
     @media (orientation: landscape) { #frame { max-width: 1100px; } }
   </style>
   $GODOT_HEAD_INCLUDE
@@ -39,6 +49,16 @@
     <button id="retry" hidden>もう一度読み込む</button>
   </section>
 </main>
+<dialog id="app-dialog" aria-labelledby="app-title" aria-describedby="app-description">
+  <h2 id="app-title">KIKORIをホーム画面に</h2>
+  <p id="app-description"></p>
+  <button id="app-install" hidden>アプリをインストール</button>
+  <p id="app-status" role="status" aria-live="polite"></p>
+  <button id="app-update" hidden>保存して新しいバージョンへ</button>
+  <button id="app-close">ゲームに戻る</button>
+</dialog>
+<script>window.kikoriBuild = null;</script>
+<script src="pwa.js"></script>
 <script src="framebuffer_guard.js"></script>
 <script src="$GODOT_URL"></script>
 <script>

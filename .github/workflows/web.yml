@@ -38,7 +38,7 @@ jobs:
           name: kikori-native-reports
           path: reports/
       - name: Upload playable Web build
-        if: always() && hashFiles('build/web/index.wasm') != ''
+        if: always() && hashFiles('build/web/releases/**/index.wasm') != ''
         uses: actions/upload-artifact@v4
         with:
           name: kikori-web
@@ -98,6 +98,16 @@ jobs:
       - name: Verify expanded forests and automation UI
         if: matrix.engine == 'chromium'
         run: python3 tests/browser_expansion.py
+        env:
+          LIBGL_ALWAYS_SOFTWARE: '1'
+      - name: Verify range tools and 128 carried logs
+        if: matrix.engine == 'chromium'
+        run: python3 tests/browser_tools.py
+        env:
+          LIBGL_ALWAYS_SOFTWARE: '1'
+      - name: Verify Chrome installability, offline boot and saved updates
+        if: matrix.engine == 'chromium'
+        run: python3 tests/browser_pwa.py
         env:
           LIBGL_ALWAYS_SOFTWARE: '1'
       - name: Verify roads, linked carts and touch construction

@@ -134,6 +134,45 @@ func axe() -> ArrayMesh:
  box(Vector3(0, 0, 0.03), Vector3(0.12, 0.12, 0.17), Color("edb27e"))
  return finish()
 
+func forestry_tool(tier: int) -> ArrayMesh:
+ if tier==0: return axe()
+ var key="forestry_tool_%d" % tier
+ if OS.has_feature("web"): return cached(key)
+ begin(key)
+ box(Vector3.ZERO,Vector3(0.15,0.15,0.2),Color("edb27e"))
+ if tier==1:
+  branch(Vector3.ZERO,Vector3(0,0.06,1.2),0.055,0.045,WOOD,8)
+  box(Vector3(0,0.06,1.08),Vector3(0.08,0.52,0.38),Color("8faeb9"))
+  box(Vector3(0,0.3,1.13),Vector3(0.09,0.06,0.32),Color("e9f5f7"))
+ else:
+  branch(Vector3.ZERO,Vector3(0,0,0.9),0.06,0.04,DARK,8)
+  box(Vector3(0,0,0.2),Vector3(0.3,0.24,0.45),Color("d78a37") if tier==2 else TEAL)
+  box(Vector3(0,0.18,0.2),Vector3(0.2,0.08,0.28),DARK)
+  if tier==3:
+   box(Vector3(0,0,0.93),Vector3(1.25,0.1,0.12),DARK)
+ return finish()
+
+func saw_blade() -> ArrayMesh:
+ var key="tool_saw_blade"
+ if OS.has_feature("web"): return cached(key)
+ begin(key)
+ branch(Vector3(0,-0.025,0),Vector3(0,0.025,0),0.4,0.4,Color("bdced5"),20)
+ for i in 20:
+  var a=TAU*i/20
+  var b=a+0.16
+  tri(Vector3(cos(a)*0.36,0.03,sin(a)*0.36),Vector3(cos(b)*0.47,0.03,sin(b)*0.47),Vector3(cos(a+0.29)*0.36,0.03,sin(a+0.29)*0.36),Color("e3edf1"))
+ branch(Vector3(0,-0.04,0),Vector3(0,0.06,0),0.1,0.1,Color("bd7635"),10)
+ return finish()
+
+func cargo_frame() -> ArrayMesh:
+ var key="cargo_frame"
+ if OS.has_feature("web"): return cached(key)
+ begin(key)
+ for x in [-0.35,0.35]:
+  branch(Vector3(x,0.55,-0.31),Vector3(x,1.6,-0.31),0.035,0.035,DARK,6)
+ box(Vector3(0,0.52,-0.6),Vector3(0.85,0.08,0.8),WOOD)
+ return finish()
+
 
 func snow_tree(kind: int) -> ArrayMesh:
  var key="tree_%d" % kind

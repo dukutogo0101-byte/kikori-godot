@@ -5,6 +5,14 @@ func _initialize() -> void:
 func bake() -> void:
  DirAccess.make_dir_recursive_absolute("res://assets/baked")
  Art.baking=true
+ # The full-bleed background is safe for Android's maskable app icons.
+ var icon_source=FileAccess.get_file_as_string("res://assets/icon.svg").replace('rx="28"','rx="0"')
+ for size in [192,512]:
+  var icon=Image.new()
+  var error=icon.load_svg_from_string(icon_source,float(size)/128)
+  assert(error==OK)
+  error=icon.save_png("res://build/web/app-icon-%d.png" % size)
+  assert(error==OK)
  var scene=load("res://scenes/main.tscn").instantiate()
  root.add_child(scene)
  await process_frame

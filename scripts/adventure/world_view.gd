@@ -13,6 +13,11 @@ var hero: Node3D
 var body: MeshInstance3D
 var legs: Array = []
 var axe: Node3D
+var tools: Array = []
+var saw_blades: Array = []
+var cut_ring: MeshInstance3D
+var collect_ring: MeshInstance3D
+var extra_target_rings: MultiMeshInstance3D
 var camera: Camera3D
 var trees: Array = []
 var bridges: Array = []
@@ -187,13 +192,25 @@ func setup(state, ui_font: Font) -> void:
  axe = Node3D.new()
  axe.position = Vector3(0.3,1.04,0.05)
  hero.add_child(axe)
- mesh(axe,art.axe()).scale = Vector3.ONE * 1.12
+ for tier in 4:
+  var tool=Node3D.new()
+  axe.add_child(tool)
+  mesh(tool,art.forestry_tool(tier)).scale=Vector3.ONE*1.12
+  if tier>=2:
+   for x in ([0.0] if tier==2 else [-0.63,0.63]):
+    var blade=mesh(tool,art.saw_blade(),Vector3(x,0,1.05))
+    saw_blades.append(blade)
+  tools.append(tool)
+ mesh(hero,art.cargo_frame())
  mesh(hero,art.ring(0.5,0.08,Color("f1bc55")),Vector3(0,0.025,0))
  load_label = label(hero,"",Vector3(0,2.45,0),Color("234d67"),37)
  for kind in 3:
   var log_shape = art.log_mesh(kind)
   ground_batches.append(batch(self,log_shape,Defs.MAX_GROUND))
-  cargo_batches.append(batch(hero,log_shape,30))
+  cargo_batches.append(batch(hero,log_shape,Defs.CARRY_CAPACITY))
+ cut_ring=mesh(self,art.ring(1.0,0.018,Color("e1aa43")))
+ collect_ring=mesh(self,art.ring(1.0,0.014,Color("5fae9e")))
+ extra_target_rings=batch(self,art.ring(0.58,0.055,Color("e3ad48")),game.trees.size())
  target_ring = mesh(self,art.ring(0.61,0.09,Color("f4b952")))
  target_label = label(self,"",Vector3.ZERO,Color("51411e"),40)
  # Fixed pools: their object count doesn't depend on session length.
@@ -226,6 +243,11 @@ func setup(state, ui_font: Font) -> void:
 func CUT_COLOR() -> Color:
  return Art.CUT
 
+func cargo_position(index: int) -> Vector3:
+ # Eight small logs per layer, sixteen layers: a bounded bundle of 128 logs.
+ var slot=clampi(index,0,Defs.CARRY_CAPACITY-1)
+ return Vector3(-0.27+(slot%2)*0.54,0.64+floori(float(slot)/8)*0.13,-0.43-(floori(float(slot%8)/2))*0.14)
+
 func handle(event: Dictionary) -> void:
  if event.type in ["hit","auto_hit"]:
   if event.type=="hit": axe_impact = 0.11
@@ -242,10 +264,10 @@ func handle(event: Dictionary) -> void:
     effect.type = event.type
     effect.id = event.get("id",-1)
     effect.node.mesh = cargo_batches[event.kind].multimesh.mesh
-    effect.from = Defs.point(event.from,0.2) if event.type == "pickup" else hero.to_global(Vector3(0,0.95+floori(float(game.bag.size())/2)*0.16,-0.42-(game.bag.size()%2)*0.2))
+    effect.from = Defs.point(event.from,0.2) if event.type == "pickup" else hero.to_global(cargo_position(game.bag.size()))
     effect.to = Defs.point(event.to,0.4) if event.has("to") else hero.global_position
     effect.node.visible = true
-    effect.node.scale = Vector3.ONE*0.6
+    effect.node.scale = Vector3.ONE*0.4
     effect.node.rotation = Vector3(0,PI/2,0)
     effect.label.text = "+%d" % event.amount if event.type == "sell" else ""
     effect.label.visible = event.type == "sell"
@@ -277,15 +299,24 @@ func update(delta: float) -> void:
  var angle = atan2(game.facing.x,game.facing.y)
  hero.rotation.y = lerp_angle(hero.rotation.y,angle,1-exp(-20*delta))
  var moving = game.velocity.length() > 0.1
- var gait = sin(clock*(10+game.levels.boots)) if moving else 0.0
+ var gait = sin(clock*16) if moving else 0.0
  legs[0].rotation.x = gait*0.55
  legs[1].rotation.x = -gait*0.55
  body.position.y = absf(gait)*0.035
  body.rotation.z = sin(clock*6)*0.04 if moving and game.bag.size()>=game.capacity() else 0.0
- axe.rotation.x = 1.1 if axe_impact>0 else (-1.2+2.2*pow(game.chop_clock/game.cut_interval(),3) if game.target>=0 else -0.25+gait*0.12)
+ var tier=game.tool_tier()
+ for i in tools.size(): tools[i].visible=i==tier
+ tools[tier].scale=Vector3.ONE*(1.12 if game.levels.cut_range in [2,4,6] else 1.0)
+ axe.rotation.x = (0.0 if game.target>=0 else -0.25+gait*0.12) if tier>=2 else (1.1 if axe_impact>0 else (-1.2+2.2*pow(game.chop_clock/game.cut_interval(),3) if game.target>=0 else -0.25+gait*0.12))
+ for blade in saw_blades: blade.rotation.y=clock*(30 if game.target>=0 else 3)
  axe.rotation.z = -0.25
  load_label.text = "%d / %d%s" % [game.bag.size(),game.capacity(),"  満載" if game.bag.size()>=game.capacity() else ""]
- load_label.position.y = 2.25+minf(game.bag.size()*0.10,1.7)
+ load_label.position.y = maxf(2.15,0.96+floori(float(maxi(0,game.bag.size()-1))/8)*0.13)
+ for ring in [cut_ring,collect_ring]:
+  ring.visible=not planning and not show_routes
+  ring.position=Defs.point(game.position,0.045 if ring==cut_ring else 0.035)
+  var radius=game.cut_radius() if ring==cut_ring else game.collect_radius()
+  ring.basis=Defs.surface(game.position).scaled(Vector3(radius,1,radius))
  for i in trees.size():
   var t = game.trees[i]
   var view = trees[i]
@@ -322,21 +353,22 @@ func update(delta: float) -> void:
  for i in game.bag.size():
   var log = game.bag[i]
   if pending.has(log.id): continue
-  var row = floori(float(i)/2)
-  var at = Vector3(0,0.95+row*0.16,-0.42-(i%2)*0.2)
+  var at = cargo_position(i)
   at.x += sin(clock*6+i*0.4)*0.025 if moving else 0.0
-  var transform = Transform3D(Basis(Vector3.UP,PI/2).scaled(Vector3.ONE*0.55),at)
+  var transform = Transform3D(Basis(Vector3.UP,PI/2).scaled(Vector3.ONE*0.4),at)
   cargo_batches[log.kind].multimesh.set_instance_transform(counts[log.kind],transform)
   counts[log.kind]+=1
  for i in 3: cargo_batches[i].multimesh.visible_instance_count = counts[i]
  target_ring.visible = game.target>=0
  target_label.visible = game.target>=0
+ extra_target_rings.multimesh.visible_instance_count=game.targets.size()
+ for i in game.targets.size():
+  extra_target_rings.multimesh.set_instance_transform(i,Transform3D(Defs.surface(game.trees[game.targets[i]].position),Defs.point(game.trees[game.targets[i]].position,0.04)))
  if game.target>=0:
   var t = game.trees[game.target]
   target_ring.position = Defs.point(t.position,0.035)
   target_label.position = Defs.point(t.position,3.2)
-  target_label.text = "%s · 売値 %d
-%d / %d" % [Defs.KINDS[t.kind].name+(" · 良質" if t.quality>0 else ""),game.value(t.kind,t.quality),t.hp,Defs.KINDS[t.kind].hp]
+  target_label.text = "%s · %d 本を伐採\n%d / %d" % [game.tool_name(),game.targets.size(),t.hp,Defs.KINDS[t.kind].hp]
  for effect in effects:
   if effect.age < 0: continue
   effect.age += delta
@@ -344,7 +376,7 @@ func update(delta: float) -> void:
   var index = 0
   for i in game.bag.size():
    if game.bag[i].id == effect.id: index = i; break
-  var destination = hero.to_global(Vector3(0,0.95+floori(float(index)/2)*0.16,-0.42-(index%2)*0.2))
+  var destination = hero.to_global(cargo_position(index))
   var end = destination if effect.type == "pickup" else effect.to
   effect.node.position = effect.from.lerp(end,progress)+Vector3(0,sin(progress*PI)*1.1,0)
   if effect.type == "pickup": effect.node.rotation.y = hero.rotation.y+PI/2
@@ -417,4 +449,6 @@ func counts() -> Dictionary:
  var active=0
  for effect in effects: active+=1 if effect.age>=0 else 0
  for chip in chips: active+=1 if chip.age>=0 else 0
- return {"nodes":get_child_count(),"effect_pool":effects.size()+chips.size(),"active_effects":active,"ground_instances":game.ground.size(),"cargo_instances":game.bag.size()}
+ var rendered_cargo=0
+ for batch_node in cargo_batches: rendered_cargo+=batch_node.multimesh.visible_instance_count
+ return {"nodes":get_child_count(),"effect_pool":effects.size()+chips.size(),"active_effects":active,"ground_instances":game.ground.size(),"cargo_instances":game.bag.size(),"rendered_cargo":rendered_cargo,"tool_tier":game.tool_tier()}

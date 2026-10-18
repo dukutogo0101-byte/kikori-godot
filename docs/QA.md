@@ -1,3 +1,16 @@
+# Tools and installable app verification (v6)
+
+The current watershed save key is retained. Schema v5 is validated with its original purchase ledger before the retired pack/boots costs are refunded; the next write is v6. Existing terrain, timber IDs/quality, roads, carts, automation, projects, axe damage and position are retained. Both ordinary and JSON-number save round trips are covered. All 49 combinations of old pack/boots levels and repeated v6 reloads are checked.
+
+- Standard movement is 6.5m/s, standard carrying capacity is 128. MultiMesh cargo uses eight logs per layer in sixteen layers, with shared slot coordinates for pickup/deposit animation. Native scene checks render all 128 distinct slots with bounded height and fixed object pools.
+- Cutting upgrades expand radius from 1.62 to 7.6m and apply damage to every eligible tree in the radius. Four tool meshes (hand axe, long axe, circular saw, twin saw) and animated blades are baked for Web. Collection radius expands from 1.65 to 8.5m. Resource rays respect terrain, water, completed bridges and buildings. Each fall reserves its whole yield before damage, preserving the ground cap and timber ledger.
+- Fresh physical progression remains part of the adventure/browser suites. Dedicated browser scenarios use native-validated earned-money fixtures, actual purchase buttons, simultaneous cuts, collection, every new tool tier, 128 carried logs and reload.
+- The PWA has 192/512px maskable icons, a relative identity/scope/start URL and standalone display. We retain Chrome's native promotion. An equipment-menu entry offers the native prompt when available and manual instructions otherwise. Web dialogs pause the game.
+- Versioned asset paths prevent mixed engine/data releases. A prepared worker waits for an explicit save acknowledgement before a requested update; failed saves refuse activation. Two complete release caches preserve another active tab. Policy tests cover request scope, old asset fetches, prompt dismissal/acceptance and update acknowledgement. Chrome CI additionally audits actual installability, reloads the actual game offline, updates while another tab is open and verifies that saved 128-log cargo survives. Synthetic prompt-response tests are UI tests, not evidence of OS installation.
+- Native GL screenshots reviewed locally: all four tool forms, the equipment menu and a full 128-log bundle. Current Actions reports are authoritative for browser/deployment results. Physical Android/Chrome automatic-prompt timing and phone performance are unmeasured.
+
+Earlier sections describe v5 and historical releases.
+
 # Watersheds verification
 
 ## Redesigned world (v5)
