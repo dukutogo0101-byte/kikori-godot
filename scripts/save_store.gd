@@ -2,7 +2,7 @@ extends RefCounted
 ## localStorage is synchronous, durable across reloads, and independent of IndexedDB flushes.
 const KEY = "kikori.watersheds.v5"
 const FILE = "user://kikori_watersheds_v5.json"
-const MAX_BYTES = 512000
+const MAX_BYTES = 4000000
 var available = true
 var message = ""
 var file_path = FILE
@@ -38,6 +38,10 @@ func write_save(state: Dictionary) -> bool:
 	var payload = state.duplicate(true)
 	payload["saved_at"] = Time.get_unix_time_from_system()
 	var raw = JSON.stringify(payload, "", true, true)
+	if raw.length() > MAX_BYTES:
+		available = false
+		message = "保存データが大きすぎます。既存の保存は保持されています。"
+		return false
 	if OS.has_feature("web"):
 		# JSON.stringify of a string is a safe JS literal, including user-controlled text.
 		var script = "(function(){try{localStorage.setItem('%s', %s);return 1;}catch(e){return 0;}})()" % [KEY, JSON.stringify(raw)]

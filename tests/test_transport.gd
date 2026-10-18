@@ -1,5 +1,6 @@
 extends SceneTree
 const State=preload("res://scripts/adventure/game_state.gd")
+const Store=preload("res://scripts/save_store.gd")
 const Defs=preload("res://scripts/adventure/definitions.gd")
 var assertions=0
 var failures=0
@@ -222,5 +223,15 @@ func run() -> void:
  scene.game.logistics.carts[0].tier=0;scene.world.update(0.1)
  check(view.carts[0].shapes[0].visible and not view.carts[0].horse_legs[0].visible,"Human tier retains original handcart artwork")
  scene.queue_free()
+ # The larger fleet must never write a save that its own reader rejects.
+ var store=Store.new("user://transport-storage-test.json")
+ var payload=game.snapshot();payload.future_metadata="x".repeat(600000)
+ check(store.write_save(payload),"Large fleet-sized save writes atomically beyond the former 512 KB limit")
+ var loaded=store.read_save()
+ check(not loaded.is_empty() and State.new().restore(loaded),"Large save reads back through the same storage contract")
+ payload.future_metadata="x".repeat(Store.MAX_BYTES)
+ check(not store.write_save(payload),"Oversized save is refused before overwriting a valid previous save")
+ check(State.new().restore(store.read_save()),"Failed oversized save retains previous playable progress")
+ DirAccess.remove_absolute(store.file_path)
  print("KIKORI_TRANSPORT_TESTS assertions=%d failures=%d" % [assertions,failures])
  quit(1 if failures else 0)

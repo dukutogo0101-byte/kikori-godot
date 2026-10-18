@@ -6,8 +6,13 @@ from functools import partial
 from http.server import SimpleHTTPRequestHandler,ThreadingHTTPServer
 from playwright.sync_api import sync_playwright
 from browser_smoke import ready,state,tap,capture,KEY
-from browser_logistics import click,select
+from browser_logistics import click as base_click,select
 from browser_facilities import frames
+
+def click(page,key):
+    # Respect the same purchase debounce on fast and slow GPU hosts.
+    page.wait_for_timeout(300)
+    base_click(page,key)
 
 def context_with(browser,name,errors):
     fixture=json.loads(Path('reports/'+name+'.json').read_text())
@@ -75,7 +80,7 @@ def run(browser,url):
     try:
         page.goto(url);ready(page);tap(page,'logistics');click(page,'cart_pause0');tap(page,'log_close')
         baseline=fixture['money'];seen=set()
-        for _ in range(150):
+        for _ in range(300):
             current=state(page);cart=current['logistics']['carts'][0];seen.add(cart['order_index'])
             if current['money']==baseline+240 and cart['order_index']==0:break
             page.wait_for_timeout(1000)
