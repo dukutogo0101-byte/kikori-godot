@@ -33,7 +33,7 @@ func setup(state, view) -> void:
   var shapes=[]
   for kind in ["storage","processor","factory"]: shapes.append(world.mesh(root,art.facility(kind)))
   var ring=world.mesh(self,art.ring(1.0,0.15,Color("6a9ac1")))
-  var label=world.label(self,"",Vector3.ZERO,Color("32617c"),35)
+  var label=world.label(self,"",Vector3.ZERO,Color("32617c"),35);label.pixel_size=0.014
   var batches=[]
   for stage in 3:
    for kind in 3: batches.append(world.batch(self,art.goods(kind,stage),48))

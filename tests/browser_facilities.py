@@ -112,7 +112,7 @@ def run(browser,url):
         assert state(page)['logistics']['carts'][0]['cargo']==[]
     finally:context.close()
     # A previous release's actual loaded cart and worker inventories migrate.
-    context,page,fixture=context_with(browser,'production-migration-fixture',errors)
+    context,page,fixture=context_with(browser,'production-legacy-fixture',errors)
     try:
         page.goto(url);ready(page);assert state(page)['version']==7 and state(page)['conserved']
         page.reload();ready(page);assert state(page)['version']==7 and state(page)['conserved']

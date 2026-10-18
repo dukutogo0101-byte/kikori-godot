@@ -152,6 +152,7 @@ func _initialize() -> void:
  check(migrated.logistics.roads==old.logistics.roads and migrated.logistics.carts[0].cargo.size()==old.logistics.carts[0].cargo.size(),"Existing roads and loaded cart survive migration")
  var again=State.new();check(again.restore(migrated.snapshot()) and again.money==migrated.money and again.migrated_refund==0,"Saving schema 7 prevents repeated migration credits")
  fixture("production-migration-fixture",migrated)
+ fixture("production-legacy-fixture",old)
  # Malformed buffers, duplicated IDs, unsupported stages and paths fail atomically.
  var valid=stall.snapshot();var before_state=JSON.stringify(stall.snapshot())
  var bad=valid.duplicate(true);bad.logistics.sites[0].input[0].stage=2
@@ -161,6 +162,7 @@ func _initialize() -> void:
  bad=valid.duplicate(true);bad.logistics.next_site=1
  check(not stall.restore(bad),"Site identifiers cannot collide after reload")
  # One hour with a physical NPC and no shipments reaches bounded storage safely.
+ depot.worker_enabled=true
  for i in 36000: npc.tick(0.1,Vector2.ZERO)
  check(npc.conserved() and npc.logistics.held(0)<=npc.logistics.capacity(depot.id),"One-hour facility simulation stays bounded and conserves wood")
  print("KIKORI_FACILITY_TESTS assertions=%d failures=%d" % [assertions,failures])

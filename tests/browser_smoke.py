@@ -107,10 +107,14 @@ def move(page, x, z):
                 if abs(dx) < .28 and abs(dz) < .28:
                     return
                 strength = min(.6, max(.16, distance * .42))
-                page.mouse.move(260, 540)
+                # A freely placed building may occupy the old fixed stick
+                # origin. Start below the facilities for these UI scenarios.
+                ui=page.evaluate('window.kikoriUi')
+                stick_x,stick_y=(64,ui['height']-164) if ui.get('site_points') else (260,540)
+                page.mouse.move(stick_x,stick_y)
                 page.mouse.down()
-                page.mouse.move(260 + dx / distance * 64 * strength,
-                                540 + dz / distance * 64 * strength)
+                page.mouse.move(stick_x + dx / distance * 64 * strength,
+                                stick_y + dz / distance * 64 * strength)
                 page.wait_for_timeout(240)
                 page.mouse.up()
                 page.wait_for_timeout(220)
