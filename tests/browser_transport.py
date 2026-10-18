@@ -35,7 +35,7 @@ def run(browser,url):
         click(page,'cart_upgrade0');page.wait_for_function('window.kikoriState.logistics.carts[0].tier===1')
         assert state(page)['money']==before-6000 and state(page)['logistics']['carts'][0]['level']==1
         capture(page,engine+'-transport-horse-upgrade')
-        tap(page,'log_close');frames(page,4);capture(page,engine+'-transport-horse-world')
+        click(page,'source_focus');frames(page,4);capture(page,engine+'-transport-horse-world');tap(page,'road_done')
         # Vehicle is parked: configuration and promotion do not move any cargo.
         tap(page,'logistics')
         for level,cost in [(2,1800),(3,3600),(4,7200),(5,14400)]:
@@ -62,6 +62,7 @@ def run(browser,url):
         capture(page,engine+'-transport-three-orders')
         # Fill current building limit using purchased, actually configured carts.
         chosen(page,0,4,'site1','market0')
+        click(page,'source_focus');frames(page,4);capture(page,engine+'-transport-truck-world');tap(page,'road_done');tap(page,'logistics')
         for count in range(2,7):
             click(page,'cart_buy');page.wait_for_function('(n)=>window.kikoriState.logistics.carts.length===n',arg=count)
         before=state(page)['money'];click(page,'cart_buy');frames(page)
@@ -69,7 +70,6 @@ def run(browser,url):
         tap(page,'log_close');page.wait_for_timeout(3300);page.reload();ready(page)
         cart=state(page)['logistics']['carts'][0]
         assert cart['tier']==2 and len(cart['orders'])==3 and cart['pause_requested'] and state(page)['conserved']
-        capture(page,engine+'-transport-truck-world')
         # A deliberately isolated command fixture has one vehicle, keeping actual
         # cycle assertions independent of the extra fleet purchased above.
     except Exception:

@@ -67,7 +67,7 @@ func setup(state, view) -> void:
   for x in [-0.14,0.14]: legs.append(world.mesh(human,leg_mesh,Vector3(x,0.6,0)))
   var horse_legs=[]
   for x in [-0.2,0.2]:
-   for z in [0.42,1.02]: horse_legs.append(world.mesh(root,horse_leg_mesh,Vector3(x,0.6,z)))
+   for z in [0.42,1.02]: horse_legs.append(world.mesh(root,horse_leg_mesh,Vector3(x,0.75,z)))
   var batches=[]
   for stage in 3:
    for kind in 3: batches.append(world.batch(root,art.goods(kind,stage),24))

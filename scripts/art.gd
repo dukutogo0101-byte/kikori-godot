@@ -365,8 +365,8 @@ func horse_wagon() -> ArrayMesh:
 
 func horse_leg() -> ArrayMesh:
  begin("horse_leg")
- box(Vector3(0,-0.25,0),Vector3(0.12,0.56,0.14),Color("965b3c"))
- box(Vector3(0,-0.53,0.03),Vector3(0.14,0.12,0.2),DARK)
+ box(Vector3(0,-0.32,0),Vector3(0.12,0.64,0.14),Color("965b3c"))
+ box(Vector3(0,-0.67,0.03),Vector3(0.14,0.12,0.2),DARK)
  return finish()
 
 func truck() -> ArrayMesh:

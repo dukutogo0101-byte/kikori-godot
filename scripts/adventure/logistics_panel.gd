@@ -73,7 +73,7 @@ func setup(state, owner_ui) -> void:
   append.pressed.connect(func():action.emit("order",[i,game.logistics.carts[i].orders.size(),source_id,destination_id]));col.add_child(append)
   var clear=ui.button("全命令を解除");clear.pressed.connect(func():action.emit("clear",i));col.add_child(clear)
   routes.append({"panel":panel,"label":label,"pause":pause,"upgrade":upgrade,"orders":orders,"append":append,"clear":clear})
- var note=ui.text("1台に最大3件の命令を設定でき、上から順に繰り返します。区間の間は空荷で移動。木材なし・満杯の区間は次の周回で再確認します。命令の編集は荷物を届けて休止してから。設定後に「再開」で運行。人力・馬車・トラックの各Lv.5で次の車種へ更新できます。",13);note.autowrap_mode=TextServer.AUTOWRAP_WORD_SMART;body.add_child(note)
+ var note=ui.text("1台に最大3件の命令を設定でき、上から順に繰り返します。区間の間は空荷で移動。木材なし・満杯の区間は次の周回で再確認します。命令の編集は荷物を届けて休止してから。設定後に「再開」で運行。各車種はLv.5まで。人力・馬車はLv.5で次の車種へ更新できます。",13);note.autowrap_mode=TextServer.AUTOWRAP_WORD_SMART;body.add_child(note)
  refresh()
 
 func Defs_name(index: int) -> String:
