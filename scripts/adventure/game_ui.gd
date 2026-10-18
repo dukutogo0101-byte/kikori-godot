@@ -1,7 +1,6 @@
 extends CanvasLayer
 const Defs = preload("res://scripts/adventure/definitions.gd")
 signal upgrade_requested(key: String)
-signal facility_requested(area: int,key: String)
 signal view_changed
 signal menu_changed(open: bool)
 signal sound_changed(on: bool)
@@ -12,6 +11,7 @@ var map_canvas: Control
 var map_close: Button
 var logistics_button: Button
 var logistics_panel
+var site_panel
 var root: Control
 var money_label: Label
 var bag_label: Label
@@ -23,11 +23,7 @@ var vibration_button: Button
 var install_button: Button
 var modal: PanelContainer
 var rows = {}
-var facility_rows = {}
-var area_buttons: Array = []
-var selected_area = 0
 var view_button: Button
-var stock_label: Label
 var close_button: Button
 var modal_open = false
 var sound_on = false
@@ -99,14 +95,14 @@ func setup(state, ui_font: Font) -> void:
  root.add_child(money_label)
  bag_label = text("荷物 0 / 128",15)
  root.add_child(bag_label)
- menu_button = button("道具・設備")
+ menu_button = button("道具")
  menu_button.pressed.connect(func(): show_menu(not modal_open))
  root.add_child(menu_button)
  view_button=button("視野：広い")
  view_button.add_theme_font_size_override("font_size",13)
  view_button.pressed.connect(func(): view_changed.emit())
  root.add_child(view_button)
- logistics_button=button("道路・物流")
+ logistics_button=button("建設・物流")
  logistics_button.add_theme_font_size_override("font_size",14)
  logistics_button.pressed.connect(func():show_logistics(not logistics_panel.visible))
  root.add_child(logistics_button)
@@ -156,7 +152,7 @@ func setup(state, ui_font: Font) -> void:
  var header = HBoxContainer.new()
  layout.add_child(header)
  layout.move_child(header,0)
- var title = text("道具・設備",22)
+ var title = text("道具",22)
  title.size_flags_horizontal = Control.SIZE_EXPAND_FILL
  header.add_child(title)
  close_button = button("閉じる")
@@ -180,34 +176,6 @@ func setup(state, ui_font: Font) -> void:
   purchase.pressed.connect(func(): upgrade_requested.emit(key))
   row.add_child(purchase)
   rows[key] = {"description":description,"button":purchase}
- content.add_child(text("森の自動化",21))
- var tabs=HBoxContainer.new()
- tabs.add_theme_constant_override("separation",6)
- content.add_child(tabs)
- for area in 3:
-  var tab=button(Defs.SHORT_NAMES[area])
-  tab.custom_minimum_size.x=80
-  tab.size_flags_horizontal=Control.SIZE_EXPAND_FILL
-  tab.pressed.connect(func(): selected_area=area)
-  tabs.add_child(tab)
-  area_buttons.append(tab)
- stock_label=text("",13,Color("678698"))
- stock_label.autowrap_mode=TextServer.AUTOWRAP_WORD_SMART
- content.add_child(stock_label)
- for key in ["camp","porter","mill"]:
-  var panel=PanelContainer.new()
-  panel.add_theme_stylebox_override("panel",style(Color("e3eee2"),15))
-  content.add_child(panel)
-  var column=VBoxContainer.new()
-  panel.add_child(column)
-  var description=text("",14)
-  description.autowrap_mode=TextServer.AUTOWRAP_WORD_SMART
-  column.add_child(description)
-  var purchase=button("")
-  purchase.pressed.connect(func(): facility_requested.emit(selected_area,key))
-  column.add_child(purchase)
-  facility_rows[key]={"description":description,"button":purchase}
- content.add_child(text("倉庫の緑の円で止まると木材を取り出せます。\n自動化はプレイ中に稼働。留守中の作業はありません。",12,Color("678698")))
  var options = HBoxContainer.new()
  options.add_theme_constant_override("separation",8)
  content.add_child(options)
@@ -229,6 +197,9 @@ func setup(state, ui_font: Font) -> void:
  logistics_panel.setup(game,self)
  logistics_panel.visible=false
  logistics_panel.close_requested.connect(func():show_logistics(false))
+ site_panel=preload("res://scripts/adventure/facility_panel.gd").new()
+ root.add_child(site_panel);site_panel.setup(game,self);site_panel.visible=false
+ site_panel.close_requested.connect(func():show_site(""))
  map_panel=PanelContainer.new()
  map_panel.add_theme_stylebox_override("panel",style(Color("eff6f1"),22))
  root.add_child(map_panel)
@@ -252,7 +223,8 @@ func resize() -> void:
  var left = (size.x-width)/2
  money_label.position = Vector2(left+16,39)
  money_label.size = Vector2(110,38)
- money_label.add_theme_font_size_override("font_size",20 if game.money>=100000 else 25)
+ var label_width=font.get_string_size("● %d" % game.money,HORIZONTAL_ALIGNMENT_LEFT,-1,25).x
+ money_label.add_theme_font_size_override("font_size",clampi(int(25*minf(1,96.0/maxf(1,label_width))),14,25))
  bag_label.position = Vector2(left+125,49)
  menu_button.position = Vector2(left+width-106,30)
  menu_button.size = Vector2(94,48)
@@ -280,7 +252,12 @@ func resize() -> void:
   logistics_panel.size=Vector2(minf(size.x-28,390),minf(size.y-24,720))
   logistics_panel.position=(size-logistics_panel.size)/2
 
+ if site_panel!=null:
+  site_panel.size=Vector2(minf(size.x-28,390),minf(size.y-24,580))
+  site_panel.position=(size-site_panel.size)/2
+
 func show_menu(open: bool) -> void:
+ if site_panel!=null: site_panel.visible=false
  modal_open = open
  if map_panel!=null: map_panel.visible=false
  if logistics_panel!=null: logistics_panel.visible=false
@@ -290,6 +267,7 @@ func show_menu(open: bool) -> void:
  resize()
 
 func show_logistics(open: bool) -> void:
+ site_panel.visible=false
  map_panel.visible=false
  modal.visible=false
  logistics_panel.visible=open
@@ -300,11 +278,19 @@ func show_logistics(open: bool) -> void:
  resize()
 
 func show_map(open: bool) -> void:
+ site_panel.visible=false
  modal.visible=false;logistics_panel.visible=false
  map_panel.visible=open;modal_open=open
  root.get_node("Shade").visible=open
  menu_changed.emit(open);resize()
  map_canvas.queue_redraw()
+
+func show_site(id: String) -> void:
+ modal.visible=false;map_panel.visible=false;logistics_panel.visible=false
+ site_panel.selected=id;site_panel.visible=not id.is_empty();modal_open=site_panel.visible
+ root.get_node("Shade").visible=modal_open
+ if modal_open: site_panel.refresh()
+ menu_changed.emit(modal_open);resize()
 
 func blocked(at: Vector2) -> bool:
  return modal_open or map_button.get_global_rect().has_point(at) or root.get_node("Top").get_global_rect().has_point(at) or view_button.get_global_rect().has_point(at) or logistics_button.get_global_rect().has_point(at)
@@ -331,28 +317,15 @@ func update(delta: float, controller, camera: Camera3D) -> void:
  elif game.bag.size()>=game.capacity(): hint = "満載！ 中央基地か建設の青い円へ運ぼう"
  elif game.target>=0: hint = "伐採中 · 動くとすぐに中断できる"
  if game.target>=0 and game.ground.size()+Defs.KINDS[game.trees[game.target].kind]["yield"]>Defs.MAX_GROUND: hint = "落ちている丸太を先に運ぼう"
- for project in Defs.PROJECTS:
+ for project in game.active_projects():
   if game.position.distance_to(project.position)<1.3 and not game.complete(project.id):
    hint = "%s · 止まると木材を投入" % project.name
- for area in 3:
-  if game.automation.levels[area].camp>0 and game.position.distance_to(Defs.CAMPS[area])<1.3:
-   hint="倉庫 · 止まると木材を取り出す（建設にも使える）"
- for area in 3:
-  if game.logistics.depot_levels[area]>0 and game.position.distance_to(game.Logistics.DEPOTS[area])<1.3:
-   hint="集積倉庫 · "+("預ける" if game.logistics.depot_mode=="deposit" else "取り出す")+"（道路・物流で切替）"
+ for item in game.logistics.sites:
+  if game.position.distance_to(item.position)<1.3:
+   hint="%s · %s · タップで設定・強化" % [game.logistics.FACILITIES[item.type].name,"搬入中" if item.mode=="deposit" else "取り出し中"]
  hint_label.text = toast_text if toast_time>0 else hint
  view_button.text="視野：最大" if game.wide_view else "視野：広い"
- for area in 3:
-  area_buttons[area].text=("● " if selected_area==area else "")+Defs.SHORT_NAMES[area]
- var auto=game.automation
- var open=game.area_open(selected_area)
- stock_label.text="倉庫 %d / %d 本 · 作業員の荷物 %d 本" % [auto.stocks[selected_area].size(),auto.capacity(selected_area),auto.cutters[selected_area].cargo.size()+auto.porters[selected_area].cargo.size()] if open else "橋を完成すると、この森にも設備を建てられます"
- for key in facility_rows:
-  var level=int(auto.levels[selected_area][key])
-  var effect="威力 %d → %d / 倉庫 %d 本" % [level,mini(level+1,Defs.AUTO_MAX_LEVEL),12+mini(level+1,Defs.AUTO_MAX_LEVEL)*8] if key=="camp" else ("一度に %d → %d 本運搬" % [4+level*4,4+mini(level+1,Defs.AUTO_MAX_LEVEL)*4] if key=="porter" else "売値 +%d%% → +%d%%" % [level*25,mini(level+1,Defs.AUTO_MAX_LEVEL)*25])
-  facility_rows[key].description.text="%s  Lv.%d / %d\n%s\n%s" % [Defs.AUTOMATION[key].name,level,Defs.AUTO_MAX_LEVEL,Defs.AUTOMATION[key].description,effect]
-  facility_rows[key].button.text="橋で解放" if not open else ("伐採所が必要" if key!="camp" and auto.levels[selected_area].camp==0 else ("MAX" if level>=Defs.AUTO_MAX_LEVEL else "%d  ·  %s" % [auto.price(selected_area,key),"建設" if level==0 else "強化"]))
-  facility_rows[key].button.disabled=not auto.can_buy(game,selected_area,key)
+ if site_panel.visible: site_panel.refresh()
  for key in rows:
   var level = game.levels[key]
   var next = mini(Defs.MAX_LEVEL,level+1)
@@ -381,12 +354,11 @@ func summary() -> Dictionary:
  var nodes = {"menu":menu_button,"close":close_button,"sound":sound_button,"vibration":vibration_button,"view":view_button,"logistics":logistics_button,"map":map_button,"map_close":map_close}
  if install_button!=null: nodes["install"]=install_button
  for key in rows: nodes[key] = rows[key].button
- for key in facility_rows: nodes[key]=facility_rows[key].button
- for area in 3: nodes["area%d" % area]=area_buttons[area]
  for key in nodes:
   var center = nodes[key].get_global_rect().get_center()
   result[key] = {"x":center.x,"y":center.y}
  if logistics_panel!=null:
   result.merge(logistics_panel.summary())
   result["logistics_open"]=logistics_panel.visible
+ if site_panel!=null: result.merge(site_panel.summary())
  return result

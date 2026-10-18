@@ -23,9 +23,11 @@ func _draw() -> void:
   var rect=Defs.BRIDGES[i];draw_line(project(rect.get_center()+Vector2(0,-rect.size.y/2)),project(rect.get_center()+Vector2(0,rect.size.y/2)),Color("efbe72") if game.complete("bridge" if i==0 else "high_bridge") else Color("d16e55"),4)
  for area in 3:
   var p=Defs.CAMPS[area]
-  draw_circle(project(p),3,Color("4a8061"))
+
   draw_string(font,project([Vector2(-45,41),Vector2(-18,-87),Vector2(-44,-200)][area]),["雪松の盆地  10〜20","琥珀の丘陵  48","白樺の高原  150"][area],HORIZONTAL_ALIGNMENT_LEFT,-1,12,Color("203e42"))
   if not game.area_open(area): draw_string(font,project(p)+Vector2(6,0),"橋で解放",HORIZONTAL_ALIGNMENT_LEFT,-1,11,Color("f7f0d3"))
+ for item in game.logistics.sites:
+  draw_circle(project(item.position),3.5,Color(game.logistics.FACILITIES[item.type].color))
  draw_circle(project(Defs.SALE),6,Color("eebd58"))
  draw_string(font,project(Defs.SALE)+Vector2(8,-5),"中央基地",HORIZONTAL_ALIGNMENT_LEFT,-1,13,Color("243c39"))
  var here=project(game.position)

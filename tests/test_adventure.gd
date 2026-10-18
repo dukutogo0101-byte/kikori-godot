@@ -141,14 +141,14 @@ func _initialize() -> void:
  sell()
  check(game.money==funds+expected,"New species sells for correct value")
  # Build the workshop, then the final bridge: an achievable ten-minute progression.
- for project in [Defs.PROJECTS[1],Defs.PROJECTS[2]]:
+ for project in [Defs.PROJECTS[2]]:
   for trip in 35:
    if game.complete(project.id): break
    if game.bag.is_empty(): fill(1)
    path(project.position);idle(4)
   check(game.complete(project.id),"Project %s is reachable" % project.id)
   snapshot_ok()
- check(game.value(1,1)==72,"Workshop improves sale value")
+ check(game.value(1,1)==48 and game.value(1,1,1)==96 and game.value(1,1,2)==192,"Only physical processing improves sale value")
  sell()
  # Cross the second bridge with physical movement, not teleportation.
  path(Vector2(0,-106));move(Vector2(6,-106));move(Vector2(6,-130));move(Vector2(0,-130))

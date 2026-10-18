@@ -1,6 +1,6 @@
 extends SceneTree
-const State=preload("res://scripts/adventure/game_state.gd")
-const Logic=preload("res://scripts/adventure/logistics.gd")
+const State=preload("res://scripts/adventure/legacy_state.gd")
+const Logic=preload("res://scripts/adventure/legacy_logistics.gd")
 const Defs=preload("res://scripts/adventure/definitions.gd")
 var assertions=0
 var failures=0

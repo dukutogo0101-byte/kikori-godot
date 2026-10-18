@@ -83,6 +83,31 @@ func run() -> void:
  var hit=scene.roads.ground(projected)
  check(hit!=null and hit.distance_to(hill)<0.025,"Screen drawing intersects the actual elevated terrain")
  scene.roads.finish()
+ # Real placement touches preview before charging, and building taps pause input.
+ var production=JSON.parse_string(FileAccess.get_file_as_string("res://reports/production-start-fixture.json"))
+ check(scene.game.restore(production),"Facility scene fixture restores")
+ scene.roads.start_placement("processor");scene.world.update(0)
+ var place_at=Vector2(-4,14)
+ var place_screen=scene.world.camera.unproject_position(scene.game.Defs.point(place_at))
+ var place_touch=InputEventScreenTouch.new();place_touch.index=5;place_touch.pressed=true;place_touch.position=place_screen
+ scene.roads._input(place_touch);place_touch.pressed=false;scene.roads._input(place_touch)
+ check(scene.roads.has_placement and scene.game.logistics.sites.is_empty(),"Facility tap is only a placement preview")
+ var funds=scene.game.money
+ scene.roads.commit()
+ check(scene.game.logistics.sites.size()==1 and scene.game.money==funds-320,"Explicit confirmation builds and charges once")
+ check(ui.site_panel.visible and ui.modal_open and not c.enabled,"New building opens its local settings and pauses movement")
+ ui.show_site("");scene.world.update(0)
+ var item=scene.game.logistics.sites[0]
+ var building_screen=scene.world.camera.unproject_position(scene.game.Defs.point(scene.game.logistics.footprint(item).get_center(),1.0))
+ place_touch.position=building_screen;place_touch.pressed=true
+ c._input(place_touch);scene.roads._input(place_touch)
+ check(c.active_touch==-1,"Tapping a placed building never starts the movement stick")
+ place_touch.pressed=false;scene.roads._input(place_touch)
+ check(ui.site_panel.visible and ui.site_panel.selected==item.id,"Tapping the rendered building opens the correct equipment")
+ var before_level=item.level
+ scene._logistics_action("site_upgrade",item.id)
+ check(item.level==before_level+1 and scene.game.conserved(),"Local upgrade uses the selected building only")
+ ui.show_site("")
  # Exercise every baked tool and a real validated inventory above 100 logs.
  var loaded=JSON.parse_string(FileAccess.get_file_as_string("res://reports/tools-loaded-fixture.json"))
  check(scene.game.restore(loaded),"Large cargo render fixture restores")

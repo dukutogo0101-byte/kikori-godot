@@ -64,7 +64,7 @@ func _initialize() -> void:
  for i in wood_game.trees.size():
   if wood_game.trees[i].kind==2 and wood_game.trees[i].quality==2: far=i;break
  wood_game.trees[far].hp=0;wood_game.fell(far)
- for log in wood_game.ground: wood_game.bag.append({"id":log.id,"kind":log.kind,"quality":log.quality})
+ for log in wood_game.ground: wood_game.bag.append({"id":log.id,"kind":log.kind,"quality":log.quality,"stage":0})
  wood_game.ground.clear()
  var log=wood_game.bag[0]
  check(wood_game.log_value(log)==150 and wood_game.log_value(log)==wood_game.value(2)*3,"Distant highland timber rewards the journey at triple value")

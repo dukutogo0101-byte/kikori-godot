@@ -1,5 +1,6 @@
 extends SceneTree
 const State=preload("res://scripts/adventure/game_state.gd")
+const Legacy=preload("res://scripts/adventure/legacy_state.gd")
 const Defs=preload("res://scripts/adventure/definitions.gd")
 var assertions=0
 var failures=0
@@ -13,7 +14,7 @@ func produce(game, keep: int = 0) -> void:
  tree.hp=0;tree.harvested=false;game.fell(0)
  while not game.ground.is_empty():
   var log=game.ground.pop_back()
-  if game.bag.size()<keep: game.bag.append({"id":log.id,"kind":log.kind,"quality":log.quality})
+  if game.bag.size()<keep: game.bag.append({"id":log.id,"kind":log.kind,"quality":log.quality,"stage":0})
   else: game.sell_log(log,Defs.SALE)
  tree.hp=Defs.KINDS[0].hp;tree.regrow=0.0;tree.fall=0.0;tree.harvested=false
 func earned():
@@ -64,9 +65,11 @@ func _initialize() -> void:
  check(capped.conserved(),"Capped multi-cut conserves all resources")
  # Validate every old purchase level and refund exactly the retired expenditure.
  var bank=earned()
+ var old_bank=Legacy.new()
+ for i in 1000: produce(old_bank)
  for pack in range(7):
   for boots in range(7):
-   var old=bank.snapshot();old.version=5;old.levels={"axe":0,"pack":pack,"boots":boots}
+   var old=old_bank.snapshot();old.version=5;old.levels={"axe":0,"pack":pack,"boots":boots}
    var refund=0
    for key in ["pack","boots"]:
     for level in int(old.levels[key]): refund+=int(round((60 if key=="pack" else 80)*pow(1.65,level)))
@@ -75,8 +78,8 @@ func _initialize() -> void:
    check(migrated.restore(old) and migrated.money==bank.money,"Legacy purchase costs refund once (%d/%d)" % [pack,boots])
    check(migrated.capacity()==128 and migrated.speed()==6.5 and migrated.levels=={"axe":0,"cut_range":0,"collect_range":0},"Legacy gear converts to fixed equipment and fresh range levels")
    var again=State.new()
-   check(again.restore(migrated.snapshot()) and again.money==migrated.money and again.migrated_refund==0,"Saving v6 prevents a second refund")
- var legacy=bank.snapshot();legacy.version=5;legacy.levels={"axe":0,"pack":0,"boots":0}
+   check(again.restore(migrated.snapshot()) and again.money==migrated.money and again.migrated_refund==0,"Saving v7 prevents a second refund")
+ var legacy=old_bank.snapshot();legacy.version=5;legacy.levels={"axe":0,"pack":0,"boots":0}
  legacy.money+=1000000
  var live=State.new();var original_state=JSON.stringify(live.snapshot())
  check(not live.restore(legacy) and JSON.stringify(live.snapshot())==original_state,"Invalid legacy cash fails atomically before refund")
