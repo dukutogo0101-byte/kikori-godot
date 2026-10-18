@@ -351,3 +351,37 @@ func sawmill() -> ArrayMesh:
   var angle=TAU*i/16
   box(Vector3(0,1.35+sin(angle)*0.44,cos(angle)*0.44),Vector3(0.12,0.08,0.08),DARK)
  return finish()
+
+func goods(kind: int, stage: int) -> Mesh:
+ if stage==0: return log_mesh(kind)
+ begin("goods_%d_%d" % [kind,stage])
+ var color=[Color("b58053"),Color("bd8344"),Color("dfd8c4")][kind]
+ if stage==1:
+  for y in [0.0,0.13]:
+   for x in [-0.13,0.13]: box(Vector3(x,y,0),Vector3(0.24,0.11,0.95),color.lightened(y))
+ else:
+  box(Vector3(0,0.1,0),Vector3(0.52,0.44,0.78),color)
+  for z in [-0.25,0.25]: box(Vector3(0,0.1,z),Vector3(0.55,0.47,0.05),Color("607a7b"))
+ return finish()
+
+func facility(kind: String) -> Mesh:
+ begin("facility_"+kind)
+ box(Vector3(0,0.1,0),Vector3(3.2,0.2,2.2),Color("8dada4"))
+ if kind=="storage":
+  for x in [-1.4,1.4]:
+   for z in [-0.9,0.9]: box(Vector3(x,0.9,z),Vector3(0.16,1.6,0.16),WOOD)
+  box(Vector3(0,1.8,0),Vector3(3.4,0.18,2.4),Color("4b8b70"))
+  for x in [-0.9,-0.3,0.3,0.9]: box(Vector3(x,0.3,0),Vector3(0.5,0.2,1.5),WOOD)
+ elif kind=="processor":
+  box(Vector3(0,0.55,0),Vector3(2.8,0.8,1.6),Color("527f90"))
+  box(Vector3(0,1.02,0),Vector3(2.9,0.14,1.7),Color("c9d9d3"))
+  for z in [-0.5,0,0.5]: box(Vector3(0,1.15,z),Vector3(2.2,0.15,0.2),CUT)
+  box(Vector3(-0.7,1.5,0),Vector3(0.18,0.9,1.0),Color("94b6b9"))
+  box(Vector3(-1.2,1.8,-0.7),Vector3(0.25,0.25,0.25),Color("edbe65"))
+ else:
+  box(Vector3(0,0.95,0),Vector3(2.9,1.7,1.9),Color("bb996c"))
+  box(Vector3(0,1.85,0),Vector3(3.2,0.24,2.2),Color("547785"))
+  box(Vector3(1.05,2.3,-0.55),Vector3(0.4,1.1,0.45),Color("657c81"))
+  for x in [-0.9,0.1,0.9]: box(Vector3(x,1.05,0.98),Vector3(0.55,0.6,0.06),Color("b9dce1"))
+  box(Vector3(-0.2,0.6,1.03),Vector3(0.65,1.0,0.08),WOOD)
+ return finish()

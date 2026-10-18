@@ -7,6 +7,7 @@ var show_routes=false
 var planning_focus=Vector3.ZERO
 var road_preview: Array = []
 var road_preview_remove=false
+var facility_preview={}
 var logistics_view
 var art = Art.new()
 var hero: Node3D
@@ -115,27 +116,6 @@ func setup(state, ui_font: Font) -> void:
   markets.append(station)
   label(self,sale.name,Vector3(p.x,0.7,p.y),Color("61471e"),43)
   mesh(self,art.ring(1.23,0.14,Color("e7b651")),Vector3(p.x,0.03,p.y))
- for area in 3:
-  var p=Defs.CAMPS[area]
-  art.begin("camp_base_%d" % area)
-  art.box(Vector3(p.x,0.012,p.y-2.7),Vector3(3.2,0.024,2.2),Color("b3cec1"))
-  mesh(self,art.finish())
-  var building=mesh(self,art.camp(),Defs.point(p+Vector2(0,-2.7)))
-  mesh(self,art.ring(1.1,0.14,Color("69a973")),Defs.point(p,0.035))
-  var sign=label(self,"",Defs.point(p,0.8),Color("3a7348"),40)
-  var storage=batch(self,art.log_mesh(area),72)
-  var saw=mesh(self,art.sawmill(),Defs.point(p+Vector2(1.7,-2.7)))
-  camps.append({"building":building,"label":sign,"storage":storage,"saw":saw})
-  for collection in [workers,carriers]:
-   var worker=Node3D.new()
-   add_child(worker)
-   var body_mesh=mesh(worker,art.hero_body())
-   body_mesh.scale=Vector3.ONE*0.9
-   var feet=[]
-   for x in [-0.14,0.14]: feet.append(mesh(worker,art.hero_leg(),Vector3(x,0.6,0)))
-   var tool=mesh(worker,art.axe(),Vector3(0.3,1.0,0)) if collection==workers else mesh(worker,art.cart())
-   var cargo=batch(worker,art.log_mesh(area),16)
-   collection.append({"root":worker,"feet":feet,"tool":tool,"cargo":cargo,"previous":Vector3.ZERO})
  for i in [1,2]:
   label(self,"琥珀の丘陵 · 良質材 48 / 本" if i==1 else "白樺の高原 · 良質材 150 / 本",Vector3(0,0.7,Defs.AREAS[i].end.y-1.1),Color("6b502e") if i==1 else Color("2e6c8b"),43)
  sale_label = label(self,"中央基地 · ここで出荷・入金",Vector3(4,0.7,9),Color("61471e"),43)
@@ -144,7 +124,7 @@ func setup(state, ui_font: Font) -> void:
  for i in 4:
   art.box(Vector3(3.25+i*0.48,0.2,10.4),Vector3(0.42,0.34,0.72),CUT_COLOR())
  mesh(self,art.finish())
- for project in Defs.PROJECTS:
+ for project in game.active_projects():
   var p = project.position
   mesh(self,art.ring(1.1,0.12,Color("54a7bd")),Vector3(p.x,0.045,p.y))
   labels.append(label(self,"",Vector3(p.x,0.74,p.y),Color("256379"),42))
@@ -157,14 +137,6 @@ func setup(state, ui_font: Font) -> void:
    art.box(Vector3(x,0.35,rect.end.y+0.1),Vector3(0.2,0.7,0.2),Color("976b49"))
    art.box(Vector3(x,0.72,rect.end.y+0.1),Vector3(0.27,0.1,0.27),Color("e8f4fa"))
   mesh(self,art.finish())
- art.begin("workshop_frame")
- art.box(Vector3(-5,0.03,-75.2),Vector3(4,0.06,2.5),Color("83a9bb"))
- for x in [-6.7,-3.3]:
-  for z in [-76.2,-74.2]: art.box(Vector3(x,0.65,z),Vector3(0.14,1.3,0.14),Art.WOOD)
- art.box(Vector3(-5,1.3,-76.2),Vector3(3.4,0.13,0.14),Art.CUT)
- mesh(self,art.finish())
- workshop = mesh(self,art.station(true),Vector3(-5,0,-75.2))
- workshop_sign = label(self,"",Vector3(-5,3.3,-75.2),Color("256379"),42)
  var shapes = [art.snow_tree(0),art.snow_tree(1),art.snow_tree(2)]
  pale_material = art.material.duplicate()
  pale_material.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
@@ -204,10 +176,9 @@ func setup(state, ui_font: Font) -> void:
  mesh(hero,art.cargo_frame())
  mesh(hero,art.ring(0.5,0.08,Color("f1bc55")),Vector3(0,0.025,0))
  load_label = label(hero,"",Vector3(0,2.45,0),Color("234d67"),37)
- for kind in 3:
-  var log_shape = art.log_mesh(kind)
-  ground_batches.append(batch(self,log_shape,Defs.MAX_GROUND))
-  cargo_batches.append(batch(hero,log_shape,Defs.CARRY_CAPACITY))
+ for kind in 3: ground_batches.append(batch(self,art.log_mesh(kind),Defs.MAX_GROUND))
+ for stage in 3:
+  for kind in 3: cargo_batches.append(batch(hero,art.goods(kind,stage),Defs.CARRY_CAPACITY))
  cut_ring=mesh(self,art.ring(1.0,0.018,Color("e1aa43")))
  collect_ring=mesh(self,art.ring(1.0,0.014,Color("5fae9e")))
  extra_target_rings=batch(self,art.ring(0.58,0.055,Color("e3ad48")),game.trees.size())
@@ -332,16 +303,12 @@ func update(delta: float) -> void:
   var id = "bridge" if i==0 else "high_bridge"
   bridges[i].visible = game.complete(id)
   bridges[i].scale.y = 1+sin(completion_clock/0.7*PI)*0.15 if completion_id==id else 1
- for building in markets+[workshop]:
+ for building in markets:
   var occluding = building.position.z > game.position.y and building.position.z < game.position.y+4 and absf(building.position.x-game.position.x)<2
   building.material_override = pale_material if occluding else null
- workshop.visible = game.complete("workshop")
- workshop.scale = Vector3.ONE*(1+sin(completion_clock/0.7*PI)*0.08) if completion_id=="workshop" else Vector3.ONE
- workshop_sign.text = "木工工房 · 売値 ×1.5" if workshop.visible else "工房の予定地"
- for i in Defs.PROJECTS.size():
-  var p = Defs.PROJECTS[i]
-  labels[i].text = "%s\n%d / %d 本" % [p.name,game.projects[p.id],p.need] if not game.complete(p.id) else "開通！" if p.id != "workshop" else "工房 完成"
- update_automation(delta)
+ for i in game.active_projects().size():
+  var p = game.active_projects()[i]
+  labels[i].text = "%s\n%d / %d 本" % [p.name,game.projects[p.id],p.need] if not game.complete(p.id) else "開通！"
  logistics_view.update(delta)
  var counts = [0,0,0]
  for log in game.ground:
@@ -349,16 +316,17 @@ func update(delta: float) -> void:
   ground_batches[log.kind].multimesh.set_instance_transform(counts[log.kind],transform)
   counts[log.kind]+=1
  for i in 3: ground_batches[i].multimesh.visible_instance_count = counts[i]
- counts = [0,0,0]
+ counts = [0,0,0,0,0,0,0,0,0]
  for i in game.bag.size():
   var log = game.bag[i]
   if pending.has(log.id): continue
   var at = cargo_position(i)
   at.x += sin(clock*6+i*0.4)*0.025 if moving else 0.0
   var transform = Transform3D(Basis(Vector3.UP,PI/2).scaled(Vector3.ONE*0.4),at)
-  cargo_batches[log.kind].multimesh.set_instance_transform(counts[log.kind],transform)
-  counts[log.kind]+=1
- for i in 3: cargo_batches[i].multimesh.visible_instance_count = counts[i]
+  var material_index=log.kind+3*int(log.get("stage",0))
+  cargo_batches[material_index].multimesh.set_instance_transform(counts[material_index],transform)
+  counts[material_index]+=1
+ for i in 9: cargo_batches[i].multimesh.visible_instance_count = counts[i]
  target_ring.visible = game.target>=0
  target_label.visible = game.target>=0
  extra_target_rings.multimesh.visible_instance_count=game.targets.size()
@@ -408,42 +376,6 @@ func update(delta: float) -> void:
  camera_anchor = camera_anchor.lerp(follow,1-exp(-7*delta)) if delta>0 else follow
  camera.position = camera_anchor+Vector3(0,18,16)
  camera.look_at(camera_anchor+Vector3(0,0.6,0))
-
-func update_automation(delta: float) -> void:
- for area in 3:
-  var p=Defs.CAMPS[area]
-  var auto=game.automation
-  var camp=camps[area]
-  var active=auto.levels[area].camp>0
-  camp.building.visible=active
-  camp.saw.visible=auto.levels[area].mill>0
-  camp.saw.rotation.y=sin(clock*2)*0.06
-  camp.label.text="%s 倉庫 %d/%d 本" % [Defs.AREA_NAMES[area],auto.stocks[area].size(),auto.capacity(area)] if active else "%s 伐採所予定地\n道具・設備で建設" % Defs.AREA_NAMES[area]
-  var stock=auto.stocks[area]
-  for i in stock.size():
-   var at=Defs.point(Vector2(p.x-1.0+(i%6)*0.35,p.y-1.4),0.22+floori(float(i)/6)*0.26)
-   camp.storage.multimesh.set_instance_transform(i,Transform3D(Basis(Vector3.UP,PI/2).scaled(Vector3.ONE*0.7),at))
-  camp.storage.multimesh.visible_instance_count=stock.size()
-  for role in 2:
-   var view=workers[area] if role==0 else carriers[area]
-   var logic=auto.cutters[area] if role==0 else auto.porters[area]
-   view.root.visible=active if role==0 else auto.levels[area].porter>0
-   var at=Defs.point(logic.position)
-   var difference=at-view.previous
-   if difference.length()>0.001: view.root.rotation.y=atan2(difference.x,difference.z)
-   elif role==0 and logic.target>=0:
-    var direction=game.trees[logic.target].position-logic.position
-    view.root.rotation.y=atan2(direction.x,direction.y)
-   view.previous=at
-   view.root.position=at
-   var gait=sin(clock*10+area)*0.5 if difference.length()>0.001 else 0.0
-   view.feet[0].rotation.x=gait
-   view.feet[1].rotation.x=-gait
-   if role==0: view.tool.rotation.x=sin(logic.clock/0.65*PI)*1.7 if logic.target>=0 and difference.length()<0.001 else -0.25
-   for i in logic.cargo.size():
-    var cargo_at=Vector3(0,1.0+i*0.15,-0.5) if role==0 else Vector3(0,0.55+floori(float(i)/4)*0.2,-0.8-(i%4)*0.25)
-    view.cargo.multimesh.set_instance_transform(i,Transform3D(Basis(Vector3.UP,PI/2).scaled(Vector3.ONE*0.6),cargo_at))
-   view.cargo.multimesh.visible_instance_count=logic.cargo.size()
 
 func counts() -> Dictionary:
  var active=0
