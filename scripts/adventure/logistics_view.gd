@@ -7,6 +7,7 @@ var world
 var art=Art.new()
 var road_batch: MultiMeshInstance3D
 var preview_batch: MultiMeshInstance3D
+var invalid_preview_batch: MultiMeshInstance3D
 var sites: Array = []
 var ghost: Node3D
 var ghost_shapes=[]
@@ -23,7 +24,9 @@ func setup(state, view) -> void:
  art.begin("road");art.box(Vector3.ZERO,Vector3(0.96,0.035,0.96),Color("ba9874"))
  road_batch=world.batch(self,art.finish(),Logic.MAX_ROADS)
  art.begin("road_preview");art.box(Vector3.ZERO,Vector3(0.88,0.045,0.88),Color("6bcbad"))
- preview_batch=world.batch(self,art.finish(),160)
+ var preview_mesh=art.finish()
+ preview_batch=world.batch(self,preview_mesh,Logic.MAX_NETWORK)
+ invalid_preview_batch=world.batch(self,preview_mesh,Logic.MAX_NETWORK)
  for color in [Color("64d3a5"),Color("e68b70")]:
   var material=StandardMaterial3D.new();material.shading_mode=BaseMaterial3D.SHADING_MODE_UNSHADED;material.albedo_color=color;preview_materials.append(material)
  art.begin("route_arrow");art.tri(Vector3(-0.16,0,0),Vector3(0.16,0,0),Vector3(0,0,0.42),Color("f5be58"))
@@ -73,14 +76,15 @@ func update(delta: float) -> void:
  var key=str(world.road_preview)+str(world.road_preview_remove)+str(revision)
  if key!=preview_key:
   preview_key=key
-  var i=0
+  var counts=[0,0]
   for p in world.road_preview:
-   preview_batch.multimesh.set_instance_transform(i,Transform3D(Defs.surface(Vector2(p)),Defs.point(Vector2(p),0.085)));i+=1
-  preview_batch.multimesh.visible_instance_count=i
-  var valid=not world.road_preview_remove
-  for p in world.road_preview:
-   if not logistics.road_valid(game,p): valid=false;break
-  preview_batch.material_override=preview_materials[0 if valid else 1]
+   var valid=logistics.road_valid(game,p)
+   if world.road_preview_remove: valid=false
+   var index=0 if valid else 1
+   var node=preview_batch if valid else invalid_preview_batch
+   node.multimesh.set_instance_transform(counts[index],Transform3D(Defs.surface(Vector2(p)),Defs.point(Vector2(p),0.085)));counts[index]+=1
+  preview_batch.multimesh.visible_instance_count=counts[0];invalid_preview_batch.multimesh.visible_instance_count=counts[1]
+  preview_batch.material_override=preview_materials[0];invalid_preview_batch.material_override=preview_materials[1]
  var signature=str(revision)
  for cart in logistics.carts: signature+=cart.source+":"+cart.destination+";"
  if signature!=route_key:

@@ -139,3 +139,25 @@ static func porter_route(area: int) -> Array:
  if area==0: return [camp,Vector2(0,camp.y),SALE]
  if area==1: return [camp,Vector2(0,camp.y),Vector2(0,9),SALE]
  return [camp,Vector2(6,camp.y),Vector2(6,-106),Vector2(0,-106),Vector2(0,9),SALE]
+
+static func trail_routes(area: int) -> Array:
+ var routes=[porter_route(area)]
+ if area==0: routes.append([Vector2(0,13),Vector2(0,-38)])
+ if area==1:
+  routes.append([Vector2(0,-106),Vector2(6,-106),Vector2(6,-113)])
+  routes.append([Vector2(0,-106),Vector2(0,-64)])
+ return routes
+
+static func trail_cells() -> Dictionary:
+ # Shared by the terrain artwork and the cart network; no invisible free roads.
+ var cells={}
+ for area in 3:
+  for route in trail_routes(area):
+   for i in range(route.size()-1):
+    var a=Vector2i(route[i]);var b=Vector2i(route[i+1]);var at=a
+    while true:
+     if in_area(Vector2(at),area): cells[at]=true
+     if at==b: break
+     if at.x!=b.x: at.x+=1 if b.x>at.x else -1
+     else: at.y+=1 if b.y>at.y else -1
+ return cells

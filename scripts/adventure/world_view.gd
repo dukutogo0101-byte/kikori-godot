@@ -369,11 +369,14 @@ func update(delta: float) -> void:
    chip.age=-1.0
    chip.node.visible=false
  # Follow without rotating the screen's movement axes.
+ update_camera(delta)
+
+func update_camera(delta: float) -> void:
  var camera_size = (46.0 if game.wide_view else 32.0) if get_viewport().get_visible_rect().size.x < get_viewport().get_visible_rect().size.y else (30.0 if game.wide_view else 22.0)
  if planning: camera_size=42.0 if get_viewport().get_visible_rect().size.x<get_viewport().get_visible_rect().size.y else 24.0
  camera.size = lerpf(camera.size,camera_size,1-exp(-3*delta)) if delta>0 else camera_size
  var follow=planning_focus if planning else hero.position
- camera_anchor = camera_anchor.lerp(follow,1-exp(-7*delta)) if delta>0 else follow
+ camera_anchor = camera_anchor.lerp(follow,1-exp(-7*delta)) if delta>0 and not planning else follow
  camera.position = camera_anchor+Vector3(0,18,16)
  camera.look_at(camera_anchor+Vector3(0,0.6,0))
 

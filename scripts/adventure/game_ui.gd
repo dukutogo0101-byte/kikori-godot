@@ -293,7 +293,10 @@ func show_site(id: String) -> void:
  menu_changed.emit(modal_open);resize()
 
 func blocked(at: Vector2) -> bool:
- return modal_open or map_button.get_global_rect().has_point(at) or root.get_node("Top").get_global_rect().has_point(at) or view_button.get_global_rect().has_point(at) or logistics_button.get_global_rect().has_point(at)
+ if modal_open: return true
+ for node in [map_button,root.get_node("Top"),view_button,logistics_button]:
+  if node.visible and node.get_global_rect().has_point(at): return true
+ return false
 
 func toast(value: String) -> void:
  toast_text = value

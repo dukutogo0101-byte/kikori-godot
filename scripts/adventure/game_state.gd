@@ -118,7 +118,7 @@ func walkable(p: Vector2) -> bool:
 
 func move(direction: Vector2, delta: float) -> void:
  var input = direction.limit_length(1.0)
- velocity = input * speed() * (1.15 if logistics.roads.has(Logistics.cell(position)) else 1.0)
+ velocity = input * speed() * (1.15 if logistics.has_road(self,Logistics.cell(position)) else 1.0)
  if input.length() > 0.05:
   facing = input.normalized()
   target = -1

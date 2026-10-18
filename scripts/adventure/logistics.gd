@@ -4,9 +4,14 @@ const Defs = preload("res://scripts/adventure/definitions.gd")
 const ROAD_PRICE = 2
 const MAX_ROADS = 1200
 const MAX_CARTS = 6
+const MAX_NETWORK = 2400
 const LEGACY_DEPOTS = [Vector2(0,13),Vector2(0,-66),Vector2(6,-157)]
 const DIRS = [Vector2i.RIGHT,Vector2i.DOWN,Vector2i.LEFT,Vector2i.UP]
 var roads = {}
+var natural_roads = Defs.trail_cells()
+var _public_roads = {}
+var _public_key = ""
+var _navigation_revision = 0
 var road_paid = 0
 const MAX_SITES = 16
 const FACILITIES = {
@@ -29,7 +34,7 @@ static func cell(at: Vector2) -> Vector2i:
 static func line(a: Vector2i, b: Vector2i) -> Array:
  var result=[a]
  var p=a
- while p!=b and result.size()<161:
+ while p!=b and result.size()<MAX_NETWORK:
   if p.x!=b.x: p.x+=1 if b.x>p.x else -1
   elif p.y!=b.y: p.y+=1 if b.y>p.y else -1
   result.append(p)
@@ -74,7 +79,7 @@ func placement_ok(game, kind: String, at: Vector2) -> bool:
    if rect.has_point(Vector2(p)): message="作業員の通路を空けてください";return false
  for tree in game.trees:
   if tree.hp>0 and (rect.grow(0.8).has_point(tree.position) or tree.position.distance_to(at)<1.5): message="先に木を伐採して敷地を空けてください";return false
- for p in roads:
+ for p in network(game):
   if rect.grow(0.4).has_point(Vector2(p)): message="道路と建物が重なっています";return false
  for cart in carts:
   if rect.grow(0.5).has_point(cart.position): message="荷車のいる場所には建てられません";return false
@@ -153,10 +158,32 @@ func road_valid(game, p: Vector2i) -> bool:
   if tree.hp>0 and tree.position.distance_to(Vector2(p))<1.25: return false
  return true
 
+func public_roads(game) -> Dictionary:
+ var key="%d:%s:%s" % [_navigation_revision,game.complete("bridge"),game.complete("high_bridge")]
+ if key==_public_key: return _public_roads
+ _public_key=key;_public_roads={};_paths.clear()
+ for p in natural_roads:
+  if road_valid(game,p): _public_roads[p]=true
+ for i in 2:
+  if not game.complete("bridge" if i==0 else "high_bridge"): continue
+  var bridge=Defs.BRIDGES[i];var x=roundi(bridge.get_center().x)
+  for y in range(roundi(bridge.position.y),roundi(bridge.end.y)+1):
+   var p=Vector2i(x,y)
+   if road_valid(game,p): _public_roads[p]=true
+ return _public_roads
+
+func has_road(game, p: Vector2i) -> bool:
+ return roads.has(p) or public_roads(game).has(p)
+
+func network(game) -> Dictionary:
+ var result=roads.duplicate();result.merge(public_roads(game))
+ return result
+
 func path_between(game, a: Vector2i, b: Vector2i) -> Array:
+ var available=network(game)
  var key="%d,%d:%d,%d" % [a.x,a.y,b.x,b.y]
  if _paths.has(key): return _paths[key].duplicate()
- if not roads.has(a) or not roads.has(b): return []
+ if not available.has(a) or not available.has(b): return []
  var queue=[a]
  var previous={a:a}
  var head=0
@@ -165,7 +192,7 @@ func path_between(game, a: Vector2i, b: Vector2i) -> Array:
   if p==b: break
   for direction in DIRS:
    var next=p+direction
-   if roads.has(next) and not previous.has(next) and edge_ok(game,p,next):
+   if available.has(next) and not previous.has(next) and edge_ok(game,p,next):
     previous[next]=p;queue.append(next)
  if not previous.has(b): return []
  var result=[b]
@@ -188,21 +215,23 @@ func used_cells(game) -> Dictionary:
  return used
 
 func edit_roads(game, cells: Array, remove: bool = false) -> bool:
- if cells.is_empty() or cells.size()>160: message="一度に160マスまで選べます";return false
+ if cells.is_empty() or cells.size()>MAX_NETWORK: message="一度の下書きが長すぎます";return false
  var unique={}
  for p in cells:
   if not p is Vector2i: return false
   unique[p]=true
  var changes=[]
+ var existing=public_roads(game)
  var used=used_cells(game) if remove else {}
  for p in unique:
   if remove:
+   if existing.has(p): message="既存の道と橋はそのまま使えます。撤去できません";return false
    if used.has(p): message="荷車やルートが使う道路です。空荷でルートを解除してから撤去できます";return false
    if roads.has(p): changes.append(p)
   else:
    if not road_valid(game,p): message="水・建物・生きた木には敷けません。先に木を切ろう";return false
-   if not roads.has(p): changes.append(p)
- if changes.is_empty(): message="変更する道路がありません";return false
+   if not roads.has(p) and not existing.has(p): changes.append(p)
+ if changes.is_empty(): message="この道はすでに荷車で通れます";return false
  if not remove:
   if roads.size()+changes.size()>MAX_ROADS: message="道路の上限に達しました";return false
   if game.money<changes.size()*ROAD_PRICE: message="資金不足。道路は1マス2です";return false
@@ -228,7 +257,7 @@ func blocks_regrowth(at: Vector2) -> bool:
  for x in range(-2,3):
   for y in range(-2,3):
    var p=center+Vector2i(x,y)
-   if roads.has(p) and Vector2(p).distance_to(at)<1.4: return true
+   if (roads.has(p) or natural_roads.has(p)) and Vector2(p).distance_to(at)<1.4: return true
  return false
 
 func cart_price() -> int:
@@ -399,7 +428,7 @@ func costs() -> int:
  return total
 
 func invalidate_navigation() -> void:
- _walk_cache.clear()
+ _walk_cache.clear();_navigation_revision+=1;_public_key="";_paths.clear()
 
 func can_walk(game, p: Vector2i) -> bool:
  if not _walk_cache.has(p): _walk_cache[p]=game.walkable(Vector2(p))
@@ -532,7 +561,7 @@ func restore_path(game, raw, out: Array, road_only: bool = false) -> bool:
  for pair in raw:
   if not game.pair(pair) or not game.number(pair[0],-98,98,true) or not game.number(pair[1],-224,70,true): return false
   var p=Vector2i(int(pair[0]),int(pair[1]))
-  if not game.walkable(Vector2(p)) or (road_only and not roads.has(p)): return false
+  if not game.walkable(Vector2(p)) or (road_only and not has_road(game,p)): return false
   if not out.is_empty() and not edge_ok(game,out.back(),p): return false
   out.append(p)
  return true
@@ -621,11 +650,11 @@ func restore(game, data, ids: Dictionary, total: int) -> bool:
   if raw.get("phase") not in ["loading","to_source","returning","to_destination","unloading","parked"]: return false
   var copy={"id":int(raw.id),"level":int(raw.level),"source":raw.source,"destination":raw.destination,"position":Vector2(raw.position[0],raw.position[1]),"pause_requested":raw.pause_requested,"clock":float(raw.clock),"phase":raw.phase,"path":[],"cursor":0,"cargo":[],"status":"再開"}
   if not restore_logs(game,raw.get("cargo"),copy.cargo,cart_capacity(copy),ids,total): return false
-  if not raw.get("path") is Array or raw.path.size()>MAX_ROADS or not game.number(raw.get("cursor"),0,raw.path.size(),true): return false
+  if not raw.get("path") is Array or raw.path.size()>MAX_NETWORK or not game.number(raw.get("cursor"),0,raw.path.size(),true): return false
   for pair in raw.path:
    if not game.pair(pair) or not game.number(pair[0],Defs.WORLD_BOUNDS.position.x,Defs.WORLD_BOUNDS.end.x,true) or not game.number(pair[1],Defs.WORLD_BOUNDS.position.y,Defs.WORLD_BOUNDS.end.y,true): return false
    var point=Vector2i(int(pair[0]),int(pair[1]))
-   if not roads.has(point): return false
+   if not has_road(game,point): return false
    if not copy.path.is_empty() and not edge_ok(game,copy.path.back(),point): return false
    copy.path.append(point)
   copy.cursor=int(raw.cursor)
@@ -640,7 +669,7 @@ func restore(game, data, ids: Dictionary, total: int) -> bool:
    var goal=source.position if copy.phase=="to_source" else dest.position
    if Vector2(copy.path.back()).distance_to(goal)>0.002: return false
   else:
-   if not copy.path.is_empty() or copy.cursor!=0 or not roads.has(cell(copy.position)) or copy.position.distance_to(Vector2(cell(copy.position)))>0.002: return false
+   if not copy.path.is_empty() or copy.cursor!=0 or not has_road(game,cell(copy.position)) or copy.position.distance_to(Vector2(cell(copy.position)))>0.002: return false
    if copy.phase=="loading" and copy.position.distance_to(source.position)>0.002: return false
    if copy.phase=="unloading" and copy.position.distance_to(dest.position)>0.002: return false
   if (copy.phase in ["to_destination","unloading"])==copy.cargo.is_empty(): return false

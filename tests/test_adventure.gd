@@ -16,7 +16,7 @@ func move(to: Vector2) -> bool:
  for i in 2400:
   var offset = to-game.position
   if offset.length()<0.055: return true
-  game.tick(1.0/60,offset.normalized()*minf(1,offset.length()/0.055))
+  game.tick(1.0/60,offset.normalized()*minf(1,offset.length()/0.15))
  check(false,"Stuck at %s toward %s" % [game.position,to])
  return false
 func path(to: Vector2) -> bool:

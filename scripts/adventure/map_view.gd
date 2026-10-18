@@ -18,7 +18,7 @@ func _draw() -> void:
   var points=PackedVector2Array()
   for i in 24: points.append(project(lake.get_center()+Vector2(cos(i*TAU/24),sin(i*TAU/24))*lake.size/2))
   draw_colored_polygon(points,Color("5e9da9"))
- for cell in game.logistics.roads: draw_circle(project(Vector2(cell)),1.4,Color("a77d47"))
+ for cell in game.logistics.network(game): draw_circle(project(Vector2(cell)),1.4,Color("a77d47"))
  for i in 2:
   var rect=Defs.BRIDGES[i];draw_line(project(rect.get_center()+Vector2(0,-rect.size.y/2)),project(rect.get_center()+Vector2(0,rect.size.y/2)),Color("efbe72") if game.complete("bridge" if i==0 else "high_bridge") else Color("d16e55"),4)
  for area in 3:

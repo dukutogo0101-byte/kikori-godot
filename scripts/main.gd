@@ -95,7 +95,7 @@ func _process(delta: float) -> void:
  world.show_routes=ui.logistics_panel.visible
  world.update(minf(delta,0.1))
  ui.update(minf(delta,0.1),controller,world.camera)
- roads.update()
+ roads.update(minf(delta,0.1))
  diagnostic_clock += delta
  if diagnostic_clock>=0.1:
   diagnostic_clock=0
@@ -157,7 +157,7 @@ func _save() -> void:
 func _visibility(_args: Array) -> void:
  var hidden = bool(document.hidden) or web_modal_open
  controller.reset()
- roads.reset()
+ roads.cancel_stroke()
  game.velocity = Vector2.ZERO
  if hidden: _save()
  paused = hidden
@@ -166,7 +166,7 @@ func _visibility(_args: Array) -> void:
 
 func _reset_input(_args: Array) -> void:
  controller.reset()
- roads.reset()
+ roads.cancel_stroke()
  game.velocity = Vector2.ZERO
 
 func _prepare_update(_args: Array) -> void:
@@ -181,7 +181,7 @@ func _web_modal(args: Array) -> void:
 func _notification(what: int) -> void:
  if what == NOTIFICATION_APPLICATION_FOCUS_OUT or what == NOTIFICATION_WM_CLOSE_REQUEST:
   controller.reset()
-  roads.reset()
+  roads.cancel_stroke()
   game.velocity=Vector2.ZERO
   if ui.root != null: _save()
 

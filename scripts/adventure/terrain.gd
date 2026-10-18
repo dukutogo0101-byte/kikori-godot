@@ -78,10 +78,7 @@ func trails() -> ArrayMesh:
  if OS.has_feature("web"): return art.cached(key)
  art.begin(key)
  for area in 3:
-  var routes=[Defs.porter_route(area)]
-  if area==0: routes.append([Vector2(0,13),Vector2(0,-38)])
-  if area==1: routes.append([Vector2(0,-106),Vector2(6,-106),Vector2(6,-113)])
-  for route in routes:
+  for route in Defs.trail_routes(area):
    for i in range(route.size()-1):
     var direction=(route[i+1]-route[i]).normalized()
     var side=Vector2(-direction.y,direction.x)*0.65
