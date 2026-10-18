@@ -208,6 +208,24 @@ func run() -> void:
   for i in 2: bn.upgrade(browser,id)
  wood(browser,12,bn.sites[0].output);wood(browser,3,bn.sites[3].output,2)
  fixture("transport-ui-fixture",browser)
+ # A full fleet can need 108 distinct delivery/reposition pairs. Repeated
+ # queries must reuse them instead of flushing the cache every 48 paths.
+ var sizing=State.new();sizing.projects.bridge=60;sizing.projects.high_bridge=120
+ var cache=sizing.logistics;var available=cache.network(sizing).keys();var nodes=[]
+ for i in 17: nodes.append(available[int(i*available.size()/17)])
+ var queries=[]
+ for i in 17:
+  for j in 17:
+   if i!=j and queries.size()<108: queries.append([nodes[i],nodes[j]])
+ var cold_start=Time.get_ticks_usec();var cold_total=0
+ for pair in queries: cold_total+=cache.path_between(sizing,pair[0],pair[1]).size()
+ var cold_time=Time.get_ticks_usec()-cold_start
+ var warm_start=Time.get_ticks_usec();var warm_total=0
+ for pair in queries: warm_total+=cache.path_between(sizing,pair[0],pair[1]).size()
+ var warm_time=Time.get_ticks_usec()-warm_start
+ check(cold_total>queries.size() and warm_total==cold_total,"108 real road queries retain identical complete routes on reuse")
+ check(warm_time<cold_time*0.4,"Full fleet route reuse avoids repeated expensive pathfinding")
+ print("KIKORI_TRANSPORT_PATH_CACHE queries=%d cold_ms=%.1f warm_ms=%.1f" % [queries.size(),cold_time/1000.0,warm_time/1000.0])
  # Render all vehicle types and maximum logical cargo without creating one node
  # or mesh instance per cargo unit.
  var scene=load("res://scenes/main.tscn").instantiate();root.add_child(scene);await process_frame

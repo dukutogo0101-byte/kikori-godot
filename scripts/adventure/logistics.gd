@@ -5,6 +5,8 @@ const ROAD_PRICE = 2
 const MAX_ROADS = 1200
 const MAX_CARTS = 18
 const MAX_ORDERS = 3
+# 18 vehicles x 3 orders x delivery/reposition = 108 active path pairs.
+const MAX_CACHED_PATHS = 256
 const VEHICLES = [
  {"name":"人力","capacity":8,"capacity_step":4,"speed":3.3,"speed_step":0.5,"upgrade":90,"promotion":6000},
  {"name":"馬車","capacity":128,"capacity_step":32,"speed":12.0,"speed_step":1.5,"upgrade":1800,"promotion":80000},
@@ -205,7 +207,7 @@ func path_between(game, a: Vector2i, b: Vector2i) -> Array:
  var p=b
  while p!=a: p=previous[p];result.push_front(p)
  # Cache only the bounded endpoint/route queries; never every editor pixel.
- if _paths.size()>48: _paths.clear()
+ if _paths.size()>=MAX_CACHED_PATHS: _paths.clear()
  _paths[key]=result.duplicate()
  return result
 
