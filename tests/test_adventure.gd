@@ -48,9 +48,9 @@ func harvest(kind: int) -> bool:
   idle(0.2)
  check(false,"No regenerating reachable tree")
  return false
-func fill(kind: int) -> bool:
- for i in 30:
-  if game.bag.size()>=game.capacity(): return true
+func fill(kind: int, amount: int = 12) -> bool:
+ for i in 80:
+  if game.bag.size()>=mini(amount,game.capacity()): return true
   if not harvest(kind): return false
  check(false,"Couldn't fill bag")
  return false
@@ -69,11 +69,11 @@ func _initialize() -> void:
  # Cardinal and diagonal distance must match at multiple frame rates.
  for fps in [30,60,120]:
   var a=State.new(); var b=State.new()
-  a.position=Vector2(-1,10);b.position=a.position
+  a.position=Vector2(-20,45);b.position=a.position
   for i in fps:
    a.tick(1.0/fps,Vector2(1,0));b.tick(1.0/fps,Vector2(1,-1))
-  check(absf(a.position.distance_to(Vector2(-1,10))-b.position.distance_to(Vector2(-1,10)))<0.002,"No diagonal boost at %dfps" % fps)
-  check(absf(a.position.x-2.2)<0.002,"Frame independent movement at %dfps" % fps)
+  check(absf(a.position.distance_to(Vector2(-20,45))-b.position.distance_to(Vector2(-20,45)))<0.002,"No diagonal boost at %dfps" % fps)
+  check(absf(a.position.x+13.5)<0.002,"Frame independent movement at %dfps" % fps)
  # Trees, building, shore, closed bridge.
  check(not game.walkable(Vector2(-3.4,3.1)),"Tree trunk collision")
  check(not game.walkable(Vector2(4,6)),"Building collision")
@@ -88,33 +88,33 @@ func _initialize() -> void:
  check(game.trees[1].hp==hp,"No committed damage before hit interval")
  # Start a fresh game and play real routes: no economy grants or position teleporting.
  game=State.new()
- fill(0)
- check(game.bag.size()==6,"Initial pack holds six")
+ fill(0,6)
+ check(game.capacity()==128 and game.bag.size()>=6,"Standard pack holds 128 from the beginning")
+ check(game.speed()==6.5,"Standard speed equals the former maximum")
  var created=game.created.duplicate()
  game.fell(1)
  check(game.created==created,"Repeating a fall never duplicates resources")
- idle(2)
- check(game.created==created,"Full bag doesn't spawn more wood")
+ check(not game.buy("pack") and not game.buy("boots"),"Retired upgrades cannot be purchased")
  snapshot_ok()
  sell()
- check(game.money==60,"Six pine logs sell for sixty")
- check(game.buy("pack"),"First affordable upgrade")
- check(game.capacity()==10 and game.money==0,"Pack payment and effect")
- check(not game.buy("pack"),"Second purchase cannot spend the same money")
+ check(game.money>=60,"Starter pine delivery pays for the first range upgrade")
+ check(game.buy("cut_range"),"First affordable upgrade")
+ check(game.cut_radius()==2.6 and game.capacity()==128,"Tool purchase increases cutting radius with fixed capacity")
+ check(not game.buy("cut_range"),"Second purchase cannot spend the same money")
  var first_upgrade=game.first_upgrade
  fill(0);sell()
  check(game.buy("axe"),"Earned axe upgrade")
  check(game.damage()==2,"Axe noticeably increases damage")
  fill(0);sell()
- check(game.buy("boots"),"Earned boots upgrade")
- check(game.speed()>3.7,"Boots noticeably improve speed")
+ check(game.buy("collect_range"),"Earned collection upgrade")
+ check(game.collect_radius()==2.6 and game.speed()==6.5,"Collection upgrade leaves standard speed fixed")
  snapshot_ok()
  # Partially construct then interrupt, JSON reload and complete with more trips.
  fill(0)
  path(Defs.PROJECTS[0].position)
  idle(0.35)
  var partial=game.projects.bridge
- check(partial>0 and partial<10,"Construction transfers gradually")
+ check(partial>0 and partial<12,"Construction transfers gradually")
  var old=game.snapshot()
  game.tick(1.0/60,Vector2(1,0))
  var stopped=game.projects.bridge
@@ -132,6 +132,7 @@ func _initialize() -> void:
  check(game.walkable(Vector2(0,-52)),"New island unlocks")
  snapshot_ok()
  var bridge_time=game.bridge_time
+ sell()
  fill(1)
  check(game.bag.size()>0 and game.bag[0].kind==1,"Harvest new valuable species")
  var funds=game.money
@@ -195,7 +196,7 @@ func _initialize() -> void:
  var duplicate=game.snapshot();duplicate.bag[1].id=duplicate.bag[0].id
  check(not State.new().restore(duplicate),"Duplicate cargo ID rejected")
  var maximal=State.new();maximal.money=100000
- for key in ["axe","pack","boots"]:
+ for key in Defs.UPGRADE_NAMES:
   for level in Defs.MAX_LEVEL:
    var debit_balance=maximal.money
    var cost=maximal.price(key)
@@ -203,7 +204,7 @@ func _initialize() -> void:
    check(maximal.money==debit_balance-cost,"Exactly current price charged")
   var max_balance=maximal.money
   check(not maximal.buy(key) and maximal.money==max_balance,"Maximum level never charges")
- check(maximal.capacity()==30,"Maximum displayed and logical capacity agree")
+ check(maximal.capacity()==128 and maximal.speed()==6.5,"Upgrades never change standard capacity or speed")
  # Long capped simulation: no growing ground stock or extra logical resources.
  var long=State.new();long.position=Vector2(-2.45,3.1)
  for i in 36000:

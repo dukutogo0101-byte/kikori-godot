@@ -20,6 +20,7 @@ var hint_label: Label
 var menu_button: Button
 var sound_button: Button
 var vibration_button: Button
+var install_button: Button
 var modal: PanelContainer
 var rows = {}
 var facility_rows = {}
@@ -96,7 +97,7 @@ func setup(state, ui_font: Font) -> void:
  root.add_child(brand)
  money_label = text("● 0",25,Color("a97121"))
  root.add_child(money_label)
- bag_label = text("荷物 0 / 6",15)
+ bag_label = text("荷物 0 / 128",15)
  root.add_child(bag_label)
  menu_button = button("道具・設備")
  menu_button.pressed.connect(func(): show_menu(not modal_open))
@@ -161,8 +162,8 @@ func setup(state, ui_font: Font) -> void:
  close_button = button("閉じる")
  close_button.pressed.connect(func(): show_menu(false))
  header.add_child(close_button)
- content.add_child(text("道具を磨き、お金で働く拠点を育てよう",13,Color("678698")))
- for key in ["axe","pack","boots"]:
+ content.add_child(text("移動 6.5 m/s · 積載 128 本が標準装備",13,Color("678698")))
+ for key in ["axe","cut_range","collect_range"]:
   var panel = PanelContainer.new()
   panel.add_theme_stylebox_override("panel",style(Color("e0edf2"),15))
   content.add_child(panel)
@@ -170,7 +171,8 @@ func setup(state, ui_font: Font) -> void:
   row.add_theme_constant_override("separation",10)
   panel.add_child(row)
   var description = text("",15)
-  description.custom_minimum_size.y = 60
+  description.custom_minimum_size.y = 76
+  description.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
   description.size_flags_horizontal = Control.SIZE_EXPAND_FILL
   row.add_child(description)
   var purchase = button("")
@@ -217,6 +219,10 @@ func setup(state, ui_font: Font) -> void:
  vibration_button.size_flags_horizontal = Control.SIZE_EXPAND_FILL
  vibration_button.pressed.connect(func(): vibration_on = not vibration_on; vibration_button.text = "振動 ON" if vibration_on else "振動 OFF"; vibration_changed.emit(vibration_on))
  options.add_child(vibration_button)
+ if OS.has_feature("web"):
+  install_button=button("ホーム画面に追加 / アプリの更新")
+  install_button.pressed.connect(func(): JavaScriptBridge.eval("window.KikoriInstall && window.KikoriInstall.open()",true))
+  content.add_child(install_button)
  content.add_child(text("PCはWASD / 矢印キー。木のそばで止まろう",12,Color("678698")))
  logistics_panel=preload("res://scripts/adventure/logistics_panel.gd").new()
  root.add_child(logistics_panel)
@@ -312,6 +318,8 @@ func update(delta: float, controller, camera: Camera3D) -> void:
  if last_money != game.money:
   money_pulse = 0.14
   last_money = game.money
+  var label_width=font.get_string_size("● %d" % game.money,HORIZONTAL_ALIGNMENT_LEFT,-1,25).x
+  money_label.add_theme_font_size_override("font_size",clampi(int(25*minf(1,96.0/maxf(1,label_width))),14,25))
  money_pulse = maxf(0,money_pulse-delta)
  root.get_node("Brand").text = "KIKORI / SNOW TRAIL" if save_available else "KIKORI / 保存不可"
  money_label.text = "● %d" % game.money
@@ -348,8 +356,9 @@ func update(delta: float, controller, camera: Camera3D) -> void:
  for key in rows:
   var level = game.levels[key]
   var next = mini(Defs.MAX_LEVEL,level+1)
-  var effect = "威力 %d → %d" % [game.damage(),1+next] if key=="axe" else ("積載 %d → %d 本" % [game.capacity(),6+next*4] if key=="pack" else "移動 %.1f → %.1f m/s" % [game.speed(),3.2+next*0.55])
-  rows[key].description.text = "%s  Lv.%d / %d\n%s" % [Defs.UPGRADE_NAMES[key],level+1,Defs.MAX_LEVEL+1,effect]
+  var effect = "威力 %d → %d" % [game.damage(),1+next] if key=="axe" else ("半径 %.1f → %.1f m" % [game.cut_radius(),Defs.CUT_RADII[next]] if key=="cut_range" else "半径 %.1f → %.1f m" % [game.collect_radius(),Defs.COLLECT_RADII[next]])
+  var title=Defs.UPGRADE_NAMES[key]
+  rows[key].description.text = "%s  %d / %d\n%s\n%s" % [title,level,Defs.MAX_LEVEL,effect,(Defs.TOOL_NAMES[next]+"へ" if level<Defs.MAX_LEVEL else game.tool_name()) if key=="cut_range" else ("近くの丸太を自動収集" if key=="collect_range" else "道具の切れ味を強化")]
   rows[key].button.text = "%d\n購入" % game.price(key) if level<Defs.MAX_LEVEL else "MAX"
   rows[key].button.disabled = level>=Defs.MAX_LEVEL or game.money<game.price(key)
  stick.active = controller.active_touch>=0 or controller.mouse_active
@@ -370,6 +379,7 @@ func update(delta: float, controller, camera: Camera3D) -> void:
 func summary() -> Dictionary:
  var result = {"width":get_viewport().get_visible_rect().size.x,"height":get_viewport().get_visible_rect().size.y,"modal":modal_open,"map_open":map_panel.visible}
  var nodes = {"menu":menu_button,"close":close_button,"sound":sound_button,"vibration":vibration_button,"view":view_button,"logistics":logistics_button,"map":map_button,"map_close":map_close}
+ if install_button!=null: nodes["install"]=install_button
  for key in rows: nodes[key] = rows[key].button
  for key in facility_rows: nodes[key]=facility_rows[key].button
  for area in 3: nodes["area%d" % area]=area_buttons[area]

@@ -14,6 +14,7 @@ var ui = UI.new()
 var feedback = Feedback.new()
 var store = Store.new()
 var paused = false
+var web_modal_open = false
 var native_smoke = false
 var save_clock = 0.0
 var diagnostic_clock = 0.0
@@ -21,6 +22,8 @@ var document: JavaScriptObject
 var window: JavaScriptObject
 var visibility_callback: JavaScriptObject
 var reset_callback: JavaScriptObject
+var update_callback: JavaScriptObject
+var web_modal_callback: JavaScriptObject
 var purchase_lock_until = 0
 
 func _ready() -> void:
@@ -53,17 +56,22 @@ func _ready() -> void:
  ui.vibration_changed.connect(func(on): feedback.vibration = on)
  get_viewport().size_changed.connect(controller.reset)
  if not store.message.is_empty(): ui.toast(store.message)
- elif restored: ui.toast("おかえりなさい。続きの森へ！")
+ elif restored: ui.toast("標準装備に変更。靴・リュック代 %d を返金しました" % game.migrated_refund if data.get("version")==5 else "おかえりなさい。続きの森へ！")
  else: ui.toast("ドラッグで歩こう。木のそばで止まると伐採")
  if OS.has_feature("web"):
   document = JavaScriptBridge.get_interface("document")
   window = JavaScriptBridge.get_interface("window")
   visibility_callback = JavaScriptBridge.create_callback(_visibility)
   reset_callback = JavaScriptBridge.create_callback(_reset_input)
+  update_callback = JavaScriptBridge.create_callback(_prepare_update)
+  web_modal_callback = JavaScriptBridge.create_callback(_web_modal)
   document.addEventListener("visibilitychange",visibility_callback)
   window.addEventListener("kikori-input-reset",reset_callback)
+  window.addEventListener("kikori-save-before-update",update_callback)
+  window.addEventListener("kikori-web-modal-change",web_modal_callback)
   _visibility([])
   diagnostics()
+ if restored and data.get("version")==5: _save()
  if native_smoke:
   print("KIKORI_ADVENTURE_READY trees=%d objects=%s" % [game.trees.size(),world.counts()])
   get_tree().create_timer(2).timeout.connect(func(): get_tree().quit())
@@ -142,7 +150,7 @@ func _save() -> void:
  ui.save_available = store.available
 
 func _visibility(_args: Array) -> void:
- var hidden = bool(document.hidden)
+ var hidden = bool(document.hidden) or web_modal_open
  controller.reset()
  roads.reset()
  game.velocity = Vector2.ZERO
@@ -155,6 +163,15 @@ func _reset_input(_args: Array) -> void:
  controller.reset()
  roads.reset()
  game.velocity = Vector2.ZERO
+
+func _prepare_update(_args: Array) -> void:
+ _reset_input([])
+ _save()
+ JavaScriptBridge.eval("window.dispatchEvent(new CustomEvent('kikori-update-saved',{detail:"+str(store.available).to_lower()+"}))",true)
+
+func _web_modal(args: Array) -> void:
+ web_modal_open=bool(args[0].detail)
+ _visibility([])
 
 func _notification(what: int) -> void:
  if what == NOTIFICATION_APPLICATION_FOCUS_OUT or what == NOTIFICATION_WM_CLOSE_REQUEST:
@@ -176,6 +193,8 @@ func diagnostics() -> void:
 func _exit_tree() -> void:
  if document != null and visibility_callback != null: document.removeEventListener("visibilitychange",visibility_callback)
  if window != null and reset_callback != null: window.removeEventListener("kikori-input-reset",reset_callback)
+ if window != null and update_callback != null: window.removeEventListener("kikori-save-before-update",update_callback)
+ if window != null and web_modal_callback != null: window.removeEventListener("kikori-web-modal-change",web_modal_callback)
 
 func _sound(on: bool) -> void:
  feedback.sound = on

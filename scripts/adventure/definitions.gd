@@ -35,8 +35,13 @@ const PROJECTS = [
  {"id":"workshop","name":"木工工房","position":Vector2(-5,-73),"need":84,"area":1},
  {"id":"high_bridge","name":"高原への橋","position":Vector2(6,-110.5),"need":120,"area":1}
 ]
-const UPGRADE_NAMES = {"axe":"斧","pack":"リュック","boots":"靴"}
-const BASE_PRICES = {"axe":90,"pack":60,"boots":80}
+const UPGRADE_NAMES = {"axe":"伐採威力","cut_range":"伐採範囲","collect_range":"収集範囲"}
+const BASE_PRICES = {"axe":90,"cut_range":60,"collect_range":80}
+const CUT_RADII = [1.62,2.6,3.6,4.6,5.6,6.6,7.6]
+const COLLECT_RADII = [1.65,2.6,3.6,4.8,6.0,7.2,8.5]
+const TOOL_NAMES = ["手斧","長柄斧","大なた","丸のこ","大型丸のこ","双刃ハーベスター","広域ハーベスター"]
+const CARRY_CAPACITY = 128
+const WALK_SPEED = 6.5
 const MAX_LEVEL = 6
 const MAX_GROUND = 160
 const PLAYER_RADIUS = 0.34

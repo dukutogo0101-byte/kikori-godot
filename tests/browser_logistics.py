@@ -34,7 +34,7 @@ def run(browser,url):
  page.on('pageerror',lambda e:errors.append(str(e)))
  page.on('console',lambda e:errors.append(e.text) if e.type=='error' else None)
  page.goto(url);ready(page)
- assert state(page)['version']==5 and state(page)['conserved']
+ assert state(page)['version']==6 and state(page)['conserved']
  tap(page,'logistics');assert page.evaluate('window.kikoriUi.logistics_open')
  snap(page,'panel')
  select(page,'route_destination',1) # choices: camp0, depot0, market0, market1

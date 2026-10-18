@@ -83,6 +83,24 @@ func run() -> void:
  var hit=scene.roads.ground(projected)
  check(hit!=null and hit.distance_to(hill)<0.025,"Screen drawing intersects the actual elevated terrain")
  scene.roads.finish()
+ # Exercise every baked tool and a real validated inventory above 100 logs.
+ var loaded=JSON.parse_string(FileAccess.get_file_as_string("res://reports/tools-loaded-fixture.json"))
+ check(scene.game.restore(loaded),"Large cargo render fixture restores")
+ scene.world.update(0)
+ check(scene.world.counts().rendered_cargo==128,"All 128 carried logs are instanced")
+ var positions={}
+ for i in 128:
+  var p=scene.world.cargo_position(i)
+  positions[p]=true
+  check(p.y<2.7 and absf(p.x)<0.6 and absf(p.z)<1.0,"Cargo stays in a compact bounded bundle")
+ check(positions.size()==128,"Every carried log has a distinct slot")
+ for level in 7:
+  scene.game.levels.cut_range=level
+  scene.world.update(0.1)
+  var visible=0
+  for tool in scene.world.tools: visible+=1 if tool.visible else 0
+  check(visible==1 and scene.world.tools[scene.game.tool_tier()].visible,"Exactly the equipped tool is visible")
+  check(absf(scene.world.cut_ring.basis.x.length()-scene.game.cut_radius())<0.001,"Range outline follows the equipped tool")
  var count=scene.world.counts().nodes
  # Many presentation events stress the fixed pools; logical resources are untouched.
  for i in 36000:

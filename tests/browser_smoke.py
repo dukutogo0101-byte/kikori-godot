@@ -157,10 +157,10 @@ def harvest(page, kind):
     raise AssertionError('No reachable regenerated tree')
 
 
-def fill(page, kind):
-    for _ in range(30):
+def fill(page, kind, amount=12):
+    for _ in range(80):
         s = state(page)
-        if len(s['bag']) >= s['capacity']:
+        if len(s['bag']) >= min(amount, s['capacity']):
             return
         harvest(page, kind)
     raise AssertionError('Unable to fill pack')
@@ -300,17 +300,17 @@ def inspect(browser, url, engine, full):
         sell(page)
         sale_seconds = time.monotonic() - started
         capture(page, engine + '-sale')
-        buy(page, 'pack')
-        assert state(page)['capacity'] == 10
+        buy(page, 'cut_range')
+        assert state(page)['capacity'] == 128 and state(page)['speed'] == 6.5
         capture(page, engine + '-upgrades')
         saved = page.evaluate('(key) => JSON.parse(localStorage.getItem(key))', KEY)
         page.reload()
         ready(page)
-        assert state(page)['levels']['pack'] == 1 and state(page)['money'] == saved['money']
+        assert state(page)['levels']['cut_range'] == 1 and state(page)['money'] == saved['money']
         assert state(page)['projects'] == saved['projects']
         if full:
             fill(page, 0); sell(page); buy(page, 'axe')
-            fill(page, 0); sell(page); buy(page, 'boots')
+            fill(page, 0); sell(page); buy(page, 'collect_range')
             # The bridge physically blocks the route before its completion.
             path(page, 0, -37.0)
             page.keyboard.down('w'); page.wait_for_timeout(900); page.keyboard.up('w')
@@ -342,7 +342,7 @@ def inspect(browser, url, engine, full):
             sell(page)
             page.reload(); ready(page)
             assert state(page)['projects']['bridge'] == 60
-            assert state(page)['levels'] == {'axe': 1, 'pack': 1, 'boots': 1}
+            assert state(page)['levels'] == {'axe': 1, 'cut_range': 1, 'collect_range': 1}
         assert page.evaluate("JSON.parse(localStorage.getItem('kikori.adventure.v2')).old_world_marker") == 'preserve'
         final = state(page)
         # Wide controls must remain usable; resizing cannot leave a held input.
