@@ -13,11 +13,15 @@ from browser_smoke import ready,state,tap,KEY
 
 def snap(page,name): page.screenshot(path=f'reports/logistics-{name}.png')
 def bring(page,key):
- for _ in range(40):
-  ui=page.evaluate('window.kikoriUi');y=ui[key]['y']
+ recent=[]
+ for _ in range(120):
+  ui=page.evaluate('window.kikoriUi');y=ui[key]['y'];recent.append(y)
   if 165<y<710: return
-  page.mouse.move(185,530);page.mouse.wheel(0,240 if y>=710 else -240);page.wait_for_timeout(300)
- raise AssertionError(f'Button not reachable: {key}')
+  before=page.evaluate('window.kikoriState.render.process_frames')
+  page.mouse.move(185,530);page.mouse.wheel(0,12 if y>=710 else -12)
+  page.wait_for_function('(n)=>window.kikoriState.render.process_frames>=n+2',arg=before,timeout=20000)
+  page.wait_for_timeout(100)
+ raise AssertionError(f'Button not reachable: {key}; recent_y={recent[-8:]}')
 def click(page,key): bring(page,key);tap(page,key)
 def select(page,key,index):
  click(page,key)
