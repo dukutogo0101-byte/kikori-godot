@@ -145,8 +145,7 @@ func run() -> void:
   if not checked_phases.has(vehicle.phase):
    checked_phases[vehicle.phase]=true;copy_of(loop)
   if not vehicle.cargo.is_empty():
-   var active=vehicle.orders.duplicate(true)
-   check(not n.edit_order(loop,0,0,"site1","market0") and vehicle.orders==active,"Loaded vehicle rejects route edits without touching active orders or cargo")
+   check(n.can_edit_orders(vehicle),"Loaded vehicles permit command editing; dedicated live-edit tests cover safe application")
   if sequence.size()>=3 and loop.money==before+240: break
  check(seen.size()==3 and sequence.slice(0,3)==[1,2,0] and empty_move,"Execution follows 1 -> 2 -> 3 -> 1 including empty connector")
  check(loop.money==before+240 and loop.conserved(),"Only the independent finished-product delivery earns money")
@@ -168,7 +167,7 @@ func run() -> void:
  check(n.set_route(loop,0,"site1","market0") and vehicle.orders.size()==1,"Reassign a cleared vehicle through original single-route API")
  # Empty or full sources must not block useful later orders forever.
  var skip=network(true);var sn=skip.logistics
- sn.add_cart(skip,"site1","site2");sn.set_orders(skip,0,orders);sn.toggle_pause(0)
+ sn.add_cart(skip,"site1","site2");sn.set_orders(skip,0,orders)
  wood(skip,64,sn.sites[1].input);wood(skip,64,sn.sites[1].output,1)
  wood(skip,3,sn.sites[0].output);wood(skip,3,sn.sites[3].output,2)
  wood(skip,64,sn.sites[2].input,1)

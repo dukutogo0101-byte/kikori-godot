@@ -287,6 +287,17 @@ func used_cells(game) -> Dictionary:
    for pair in [[source,dest],[dest,next]]:
     if not pair[0].is_empty() and not pair[1].is_empty():
      for p in path_between(game,cell(pair[0].position),cell(pair[1].position)): used[p]=true
+  var pending=cart.get("pending_orders")
+  if pending!=null and not pending.is_empty():
+   var planned=pending.duplicate(true)
+   for i in planned.size():
+    var a=endpoint(game,planned[i].source);var b=endpoint(game,planned[i].destination)
+    var next=endpoint(game,planned[(i+1)%planned.size()].source)
+    for pair in [[a,b],[b,next]]:
+     for p in path_between(game,cell(pair[0].position),cell(pair[1].position)): used[p]=true
+   var switch_at=endpoint(game,cart.destination if not cart.cargo.is_empty() else cart.source)
+   var first_pending=endpoint(game,planned[0].source)
+   for p in path_between(game,cell(switch_at.position),cell(first_pending.position)): used[p]=true
   if not orders.is_empty():
    var first=endpoint(game,cart.source)
    for p in path_between(game,cell(cart.position),cell(first.position)): used[p]=true
@@ -400,7 +411,7 @@ func add_cart(game, source: String, destination: String) -> bool:
  if not route_ok(game,source,destination): return false
  var a=endpoint(game,source)
  game.money-=cart_price()
- carts.append({"id":carts.size()+1,"tier":0,"level":1,"orders":[{"source":source,"destination":destination}],"order_index":0,"source":source,"destination":destination,"position":a.position,"cargo":[],"phase":"loading","pause_requested":false,"path":[],"cursor":0,"clock":0.0,"status":"積み込み待ち"})
+ carts.append({"id":carts.size()+1,"tier":0,"level":1,"orders":[{"source":source,"destination":destination}],"pending_orders":null,"order_index":0,"source":source,"destination":destination,"position":a.position,"cargo":[],"phase":"loading","pause_requested":false,"path":[],"cursor":0,"clock":0.0,"status":"積み込み待ち"})
  message="人力の輸送車%dが運行を開始！" % carts.size()
  return true
 
@@ -425,22 +436,46 @@ func toggle_pause(index: int) -> bool:
  message="配送を終えてから休止します" if cart.pause_requested else "運行を再開します"
  return true
 
-func can_edit_orders(cart: Dictionary) -> bool:
- return cart.cargo.is_empty() and cart.phase in ["loading","parked"]
+func can_edit_orders(_cart: Dictionary) -> bool:
+ return true
+
+func command_orders(cart: Dictionary) -> Array:
+ return cart.pending_orders if cart.get("pending_orders")!=null else cart.orders
+
+func orders_deferred(cart: Dictionary) -> bool:
+ return not cart.cargo.is_empty() or cart.phase=="to_source"
+
+func apply_orders(cart: Dictionary, orders: Array) -> void:
+ # Called only at a stationary road cell, with the original cargo delivered.
+ cart.orders=orders.duplicate(true);cart.pending_orders=null;cart.order_index=0
+ cart.path=[];cart.cursor=0;cart.clock=0.0
+ if orders.is_empty():
+  cart.source="";cart.destination="";cart.phase="parked";cart.pause_requested=true
+ else:
+  cart.source=orders[0].source;cart.destination=orders[0].destination
+  cart.phase="parked" if cart.pause_requested else "returning"
+
+func apply_pending(cart: Dictionary) -> void:
+ apply_orders(cart,cart.pending_orders)
 
 func set_orders(game, index: int, orders: Array) -> bool:
  if index<0 or index>=carts.size(): return false
  var cart=carts[index]
- if not can_edit_orders(cart): message="命令の変更は、荷物を届けて休止してから行えます";return false
  if not orders_ok(game,orders): return false
- var a=endpoint(game,orders[0].source)
- if path_between(game,cell(cart.position),cell(a.position)).is_empty():
-  message="輸送車のいる場所から最初の出発地まで道をつなごう";return false
- # Commit only after every loaded and empty leg has been validated.
- cart.orders=orders.duplicate(true);cart.order_index=0
- cart.source=orders[0].source;cart.destination=orders[0].destination;cart.pause_requested=true
- cart.path=[];cart.cursor=0;cart.clock=0.0;cart.phase="parked"
- message="輸送車%dの運送命令を%d件に設定。再開で運行します" % [cart.id,orders.size()]
+ var first=endpoint(game,orders[0].source)
+ var start=cart.position
+ if orders_deferred(cart):
+  start=endpoint(game,cart.destination if not cart.cargo.is_empty() else cart.source).position
+ if path_between(game,cell(start),cell(first.position)).is_empty():
+  message="変更後の出発地まで道路をつなごう";return false
+ # Current delivery, cargo reservation and physical path remain untouched.
+ # Further edits replace this pending list, including a previously queued clear.
+ if orders_deferred(cart):
+  cart.pending_orders=orders.duplicate(true)
+  message="命令を変更予約。今の配送・移動が終わると命令1から反映します"
+ else:
+  apply_orders(cart,orders)
+  message="運送命令を変更しました。休止中の車両は再開で運行します"
  return true
 
 func set_route(game, index: int, source: String, destination: String) -> bool:
@@ -448,7 +483,7 @@ func set_route(game, index: int, source: String, destination: String) -> bool:
 
 func edit_order(game, index: int, slot: int, source: String, destination: String) -> bool:
  if index<0 or index>=carts.size(): return false
- var orders=carts[index].orders.duplicate(true)
+ var orders=command_orders(carts[index]).duplicate(true)
  if slot<0 or slot>orders.size() or slot>=MAX_ORDERS: message="運送命令は最大3件です";return false
  var order={"source":source,"destination":destination}
  if slot==orders.size(): orders.append(order)
@@ -457,7 +492,7 @@ func edit_order(game, index: int, slot: int, source: String, destination: String
 
 func remove_order(game, index: int, slot: int) -> bool:
  if index<0 or index>=carts.size(): return false
- var orders=carts[index].orders.duplicate(true)
+ var orders=command_orders(carts[index]).duplicate(true)
  if slot<0 or slot>=orders.size(): return false
  if orders.size()==1: return clear_route(index)
  orders.remove_at(slot)
@@ -466,12 +501,17 @@ func remove_order(game, index: int, slot: int) -> bool:
 func clear_route(index: int) -> bool:
  if index<0 or index>=carts.size(): return false
  var cart=carts[index]
- if not can_edit_orders(cart): message="配送を終えて休止してから解除してください";return false
- cart.orders=[];cart.order_index=0;cart.source="";cart.destination="";cart.phase="parked";cart.pause_requested=true;cart.path=[];cart.cursor=0;cart.clock=0.0
- message="運送命令を解除。輸送車はその場で待機します"
+ if orders_deferred(cart):
+  cart.pending_orders=[]
+  message="全解除を予約。今の配送・移動を終えてから待機します"
+ else:
+  apply_orders(cart,[])
+  message="運送命令を解除。輸送車はその場で待機します"
  return true
 
 func next_order(cart: Dictionary) -> void:
+ if cart.get("pending_orders")!=null:
+  apply_pending(cart);return
  cart.order_index=(int(cart.order_index)+1)%cart.orders.size()
  var order=cart.orders[cart.order_index]
  cart.source=order.source;cart.destination=order.destination
@@ -511,6 +551,8 @@ func tick(game, dt: float) -> void:
   if cart.phase=="to_source":
    cart.status="次の出発地へ移動中"
    if not advance(cart,dt): continue
+   if cart.get("pending_orders")!=null:
+    apply_pending(cart);continue
    cart.phase="loading"
   if cart.phase=="loading":
    if cart.pause_requested: cart.phase="parked";continue
@@ -854,7 +896,7 @@ func restore(game, data, ids: Dictionary, total: int, legacy: bool = false, old_
   if not raw.get("source") is String or not raw.get("destination") is String or not raw.get("pause_requested") is bool: return false
   if not game.pair(raw.get("position")) or not game.number(raw.get("clock"),0,0.21 if legacy else 1.0): return false
   if raw.get("phase") not in ["loading","to_source","returning","to_destination","unloading","parked"]: return false
-  var copy={"id":int(raw.id),"tier":0 if legacy else int(raw.tier),"level":int(raw.level),"orders":[],"order_index":0,"source":raw.source,"destination":raw.destination,"position":Vector2(raw.position[0],raw.position[1]),"pause_requested":raw.pause_requested,"clock":float(raw.clock),"phase":raw.phase,"path":[],"cursor":0,"cargo":[],"status":"再開"}
+  var copy={"id":int(raw.id),"tier":0 if legacy else int(raw.tier),"level":int(raw.level),"orders":[],"pending_orders":null,"order_index":0,"source":raw.source,"destination":raw.destination,"position":Vector2(raw.position[0],raw.position[1]),"pause_requested":raw.pause_requested,"clock":float(raw.clock),"phase":raw.phase,"path":[],"cursor":0,"cargo":[],"status":"再開"}
   if legacy:
    if not copy.source.is_empty(): copy.orders=[{"source":copy.source,"destination":copy.destination}]
   else:
@@ -893,6 +935,16 @@ func restore(game, data, ids: Dictionary, total: int, legacy: bool = false, old_
   if copy.phase=="parked" and not copy.pause_requested: return false
   for log in copy.cargo:
    if not accepts(copy.destination,log): return false
+  # Optional additive field: previous saves have no queued edits.
+  var pending=raw.get("pending_orders") if not legacy else null
+  if pending!=null:
+   if not pending is Array or pending.size()>MAX_ORDERS or not orders_deferred(copy): return false
+   if not pending.is_empty():
+    if not orders_ok(game,pending): return false
+    var switch_at=dest.position if not copy.cargo.is_empty() else source.position
+    var first_pending=endpoint(game,pending[0].source)
+    if path_between(game,cell(switch_at),cell(first_pending.position)).is_empty(): return false
+   copy.pending_orders=pending.duplicate(true)
   carts.append(copy)
  for item in sites:
   if incoming(item.id).size()+reserved(item.id)>capacity(item.id): return false
