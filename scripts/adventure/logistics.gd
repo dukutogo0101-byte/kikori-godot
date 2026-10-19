@@ -569,6 +569,23 @@ func player_transfer(game, id: String, dt: float) -> void:
   game.transfer_clock-=0.04
  game.transfer_clock=minf(game.transfer_clock,0.04)
 
+func stored_count() -> int:
+ var count=0
+ for item in sites: count+=item.input.size()+item.output.size()
+ for cart in carts: count+=cart.cargo.size()
+ return count
+
+func held_counts() -> Array:
+ var counts=[0,0,0]
+ for item in sites:
+  for list in [item.input,item.output]:
+   for log in list: counts[int(log.kind)]+=1
+  for worker in workers(item):
+   for log in worker.cargo: counts[int(log.kind)]+=1
+ for cart in carts:
+  for log in cart.cargo: counts[int(log.kind)]+=1
+ return counts
+
 func held(kind: int) -> int:
  var total=0
  for item in sites:
@@ -697,11 +714,16 @@ func worker_snapshot(worker: Dictionary) -> Dictionary:
  for p in worker.return_path: copy.return_path.append([p.x,p.y])
  return copy
 
-func snapshot() -> Dictionary:
+func snapshot(buffer_limit: int = -1) -> Dictionary:
  var data={"roads":[],"road_paid":road_paid,"sites":[],"next_site":next_site,"carts":[]}
  for p in roads: data.roads.append([p.x,p.y])
  for item in sites:
-  var copy=item.duplicate(true);copy.position=[item.position.x,item.position.y]
+  var copy=item.duplicate(false);copy.position=[item.position.x,item.position.y]
+  copy.input=(item.input if buffer_limit<0 else item.input.slice(0,buffer_limit)).duplicate(true)
+  copy.output=(item.output if buffer_limit<0 else item.output.slice(0,buffer_limit)).duplicate(true)
+  if buffer_limit>=0:
+   copy.input_count=item.input.size();copy.output_count=item.output.size()
+   copy.buffers_truncated=copy.input.size()<item.input.size() or copy.output.size()<item.output.size()
   copy.worker=worker_snapshot(item.worker);copy.crew=[]
   for worker in item.get("crew",[]): copy.crew.append(worker_snapshot(worker))
   data.sites.append(copy)

@@ -48,7 +48,7 @@ func read_save() -> Dictionary:
 	return parser.data
 
 func write_save(state: Dictionary) -> bool:
-	var payload = state.duplicate(true)
+	var payload = state.duplicate(false)
 	payload["saved_at"] = Time.get_unix_time_from_system()
 	var raw = JSON.stringify(payload, "", true, true)
 	if raw.to_utf8_buffer().size() > MAX_BYTES:

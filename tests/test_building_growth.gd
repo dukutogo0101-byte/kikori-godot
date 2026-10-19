@@ -151,6 +151,19 @@ func run() -> void:
  var file=FileAccess.open(store.file_path,FileAccess.WRITE);file.store_string(JSON.stringify(rich.snapshot()));file.close()
  check(State.new().restore(store.read_save()),"Existing plain JSON storage stays readable")
  DirAccess.remove_absolute(store.file_path)
+ # Large buffers have bounded read-only diagnostics, exact totals and full saves.
+ var diagnostic=State.new();check(diagnostic.restore(rich.snapshot()),"Diagnostic funds")
+ diagnostic.logistics.build(diagnostic,"processor",Vector2(-12,23),true)
+ for i in 14: diagnostic.logistics.upgrade(diagnostic,"site1")
+ var big=diagnostic.logistics.sites[0]
+ wood(diagnostic,9000,big.input);wood(diagnostic,9000,big.output,1)
+ var info=diagnostic.summary();var view_site=info.logistics.sites[0]
+ check(view_site.input.size()==256 and view_site.output.size()==256 and view_site.input_count==9000 and view_site.output_count==9000 and view_site.buffers_truncated,"Diagnostics sample IDs but retain exact buffer counts")
+ check(diagnostic.snapshot().logistics.sites[0].input.size()==9000 and diagnostic.conserved(),"Diagnostic sampling never truncates real inventories or saves")
+ check(diagnostic.logistics.stored_count()==18000 and diagnostic.logistics.held_counts()[0]==18000,"Large stock counts are constant-size metadata with one-pass conservation")
+ copy_of(diagnostic)
+ diagnostic.position=big.position
+ fixture("building-large-stock-fixture",diagnostic)
  # Fixed-size artwork pools, all structures, both sizes and six worker views.
  var scene=load("res://scenes/main.tscn").instantiate();root.add_child(scene);await process_frame
  check(scene.game.restore(npc.snapshot()),"Restore six-worker scene")

@@ -8,6 +8,8 @@ The new native suite covers all 90 type/size/structure/level combinations, exact
 
 Saves retain their existing key and synchronous success acknowledgement. Gzip envelopes support larger stocks within a bounded persisted size, and the reader also accepts existing plain JSON saves. Decompression and JSON size are bounded; a failed write preserves the prior save.
 
+Diagnostics sample at most 256 IDs per facility buffer while retaining exact input/output counts; saved inventories remain complete. A synthetic maximum-stock benchmark identified an unbounded 22 MB diagnostic payload. Large-stock diagnostics now use bounded samples and a reduced polling rate; automatic saves run every 30 seconds above 8,192 stored units, while purchases and focus loss still save immediately.
+
 The sections below record earlier verification work.
 
 # Tools and installable app verification (v6)

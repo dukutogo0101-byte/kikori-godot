@@ -1,11 +1,11 @@
 #!/usr/bin/env python3
 """Build a large facility and buy material promotions through real touch UI."""
-import argparse, json, threading
+import argparse, json, threading, gzip, base64
 from pathlib import Path
 from functools import partial
 from http.server import SimpleHTTPRequestHandler, ThreadingHTTPServer
 from playwright.sync_api import sync_playwright
-from browser_smoke import ready, state, tap, capture
+from browser_smoke import ready, state, tap, capture, KEY
 from browser_transport import context_with, click
 from browser_facilities import frames, project, screen_tap
 
@@ -63,8 +63,25 @@ def run(browser,url):
     except Exception:
         print('KIKORI_BUILDINGS_FAILED',engine,json.dumps({'ui':page.evaluate('window.kikoriUi'),'state':state(page)}),flush=True);raise
     finally:context.close()
+    context,page,fixture=context_with(browser,'building-large-stock-fixture',errors)
+    try:
+        page.goto(url);ready(page);frames(page,3)
+        screen_tap(page,page.evaluate('window.kikoriUi.site_points.site1'))
+        page.wait_for_function('window.kikoriUi.site_open')
+        site=state(page)['logistics']['sites'][0]
+        assert len(site['input'])==256 and len(site['output'])==256
+        assert site['input_count']+site['output_count']==18000 and site['buffers_truncated']
+        click(page,'site_mode') # A real settings change synchronously saves every ID.
+        raw=page.evaluate('(k)=>localStorage.getItem(k)',KEY)
+        saved=json.loads(gzip.decompress(base64.b64decode(raw[4:])))
+        buffers=saved['logistics']['sites'][0]
+        assert len(buffers['input'])+len(buffers['output'])==18000
+        page.reload();ready(page)
+        site=state(page)['logistics']['sites'][0]
+        assert site['input_count']+site['output_count']==18000 and state(page)['conserved']
+    finally:context.close()
     assert not errors,errors
-    result={'engine':engine,'large_touch_placement':True,'cost_five_times':True,'six_workers':True,'wood_stone_steel':True,'five_levels_per_structure':True,'maximum_guard':True,'save_resume':True,'errors':errors}
+    result={'engine':engine,'large_touch_placement':True,'cost_five_times':True,'six_workers':True,'wood_stone_steel':True,'five_levels_per_structure':True,'maximum_guard':True,'large_stock_save':18000,'save_resume':True,'errors':errors}
     Path('reports/buildings-'+engine+'.json').write_text(json.dumps(result,indent=2))
     print('KIKORI_BUILDINGS_BROWSER',json.dumps(result),flush=True)
 

@@ -285,15 +285,15 @@ func buy(key: String) -> bool:
  return true
 
 func conserved() -> bool:
+ var counts=logistics.held_counts()
+ for log in bag: counts[int(log.kind)]+=1
+ for log in ground: counts[int(log.kind)]+=1
  for kind in 3:
-  var held = logistics.held(kind)
-  for log in bag: held += 1 if log.kind == kind else 0
-  for log in ground: held += 1 if log.kind == kind else 0
-  if created[kind] != held + sold[kind] + spent[kind]: return false
+  if created[kind] != counts[kind] + sold[kind] + spent[kind]: return false
  return true
 
-func snapshot() -> Dictionary:
- var state = {"version": 9, "migration_credit":migration_credit, "logistics": logistics.snapshot(), "wide_view": wide_view, "position": [position.x, position.y], "facing": [facing.x, facing.y], "money": money, "levels": levels.duplicate(), "projects": projects.duplicate(), "created": created.duplicate(), "sold": sold.duplicate(), "spent": spent.duplicate(), "next_id": next_id, "elapsed": elapsed, "timings": [first_cut,first_sale,first_upgrade,bridge_time], "trees": [], "ground": [], "bag": bag.duplicate(true)}
+func snapshot(buffer_limit: int = -1) -> Dictionary:
+ var state = {"version": 9, "migration_credit":migration_credit, "logistics": logistics.snapshot(buffer_limit), "wide_view": wide_view, "position": [position.x, position.y], "facing": [facing.x, facing.y], "money": money, "levels": levels.duplicate(), "projects": projects.duplicate(), "created": created.duplicate(), "sold": sold.duplicate(), "spent": spent.duplicate(), "next_id": next_id, "elapsed": elapsed, "timings": [first_cut,first_sale,first_upgrade,bridge_time], "trees": [], "ground": [], "bag": bag.duplicate(true)}
  for tree in trees:
   state.trees.append({"hp": tree.hp, "regrow": tree.regrow, "fall": tree.fall, "cycle": tree.cycle})
  for log in ground:
@@ -443,7 +443,8 @@ func goal() -> Dictionary:
  return {"text":"奥地の良質材は最大3倍。基地へ出荷しよう", "position":Vector2(-24,-193), "label":"良質な白樺"}
 
 func summary() -> Dictionary:
- var state = snapshot()
+ # Browser diagnostics contain bounded samples and exact counts; saves keep all IDs.
+ var state = snapshot(256)
  state["bag_count"] = bag.size()
  state["capacity"] = capacity()
  state["speed"] = speed()

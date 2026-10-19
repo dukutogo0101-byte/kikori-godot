@@ -87,7 +87,7 @@ func _physics_process(delta: float) -> void:
     ui.toast(game.notice)
     _save()
  save_clock += delta if not paused else 0.0
- if save_clock>=3:
+ if save_clock>=(30.0 if game.logistics.stored_count()>8192 else 3.0):
   _save()
 
 func _process(delta: float) -> void:
@@ -97,7 +97,7 @@ func _process(delta: float) -> void:
  ui.update(minf(delta,0.1),controller,world.camera)
  roads.update(minf(delta,0.1))
  diagnostic_clock += delta
- if diagnostic_clock>=0.1:
+ if diagnostic_clock>=(1.0 if game.logistics.stored_count()>8192 else 0.1):
   diagnostic_clock=0
   diagnostics()
 
