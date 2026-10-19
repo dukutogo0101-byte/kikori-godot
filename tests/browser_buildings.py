@@ -77,8 +77,9 @@ def run(browser,url):
         buffers=saved['logistics']['sites'][0]
         assert len(buffers['input'])+len(buffers['output'])==18000
         page.reload();ready(page)
-        site=state(page)['logistics']['sites'][0]
-        assert site['input_count']+site['output_count']==18000 and state(page)['conserved']
+        after=state(page);site=after['logistics']['sites'][0]
+        # Withdraw mode may already have moved some stored output to the player.
+        assert site['input_count']+site['output_count']+len(after['bag'])==18000 and after['conserved']
     finally:context.close()
     assert not errors,errors
     result={'engine':engine,'large_touch_placement':True,'cost_five_times':True,'six_workers':True,'wood_stone_steel':True,'five_levels_per_structure':True,'maximum_guard':True,'large_stock_save':18000,'save_resume':True,'errors':errors}

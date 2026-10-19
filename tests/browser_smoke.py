@@ -75,9 +75,11 @@ def tap(page, key):
     ui = page.evaluate('window.kikoriUi')
     bounds = page.locator('#canvas').bounding_box()
     point = ui[key]
-    before_frame = state(page)['render']['process_frames']
     page.touchscreen.tap(bounds['x'] + point['x'] / ui['width'] * bounds['width'],
                          bounds['y'] + point['y'] / ui['height'] * bounds['height'])
+    # Count frames after dispatch; protocol latency may advance the old frame
+    # counter before Godot receives the input event.
+    before_frame = state(page)['render']['process_frames']
     # Software WebGL can take longer than a fixed sleep to publish the result.
     # Wait for actual presentation/diagnostic frames; never tap twice to retry.
     page.wait_for_function('(n) => window.kikoriState.render.process_frames >= n + 2',
@@ -241,9 +243,11 @@ def inspect(browser, url, engine, full):
         assert state(page)['money'] == 0, 'Old idle-game wealth must not skip the new beginning'
         first_frame = capture(page, engine + '-start')
         tap(page,'map')
+        page.wait_for_function('window.kikoriUi.map_open')
         assert page.evaluate('window.kikoriUi.map_open')
         capture(page,engine+'-watershed-map')
         tap(page,'map_close')
+        page.wait_for_function('!window.kikoriUi.modal')
         assert not page.evaluate('window.kikoriUi.modal')
         if engine == 'chromium':
             touch_checks(page, context)
