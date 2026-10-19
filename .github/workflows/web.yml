@@ -58,8 +58,28 @@ jobs:
       matrix:
         include:
           - engine: chromium
+            suite: roads
+            flags: ''
+          - engine: chromium
+            suite: transport
+            flags: ''
+          - engine: chromium
+            suite: tools
+            flags: ''
+          - engine: chromium
+            suite: pwa
+            flags: ''
+          - engine: chromium
+            suite: facilities
+            flags: ''
+          - engine: chromium
+            suite: game
             flags: --full
+          - engine: chromium
+            suite: maps
+            flags: ''
           - engine: webkit
+            suite: all
             flags: ''
     steps:
       - uses: actions/checkout@v4
@@ -91,47 +111,51 @@ jobs:
           LIBGL_ALWAYS_SOFTWARE: '1'
           WEBKIT_DISABLE_DMABUF_RENDERER: '1'
       - name: Verify straight roads, continuous drafting and existing-road transport
+        if: matrix.suite == 'roads' || matrix.engine == 'webkit'
         run: xvfb-run -a python3 tests/browser_roads.py --engine "${{ matrix.engine }}"
         env:
           LIBGL_ALWAYS_SOFTWARE: '1'
           WEBKIT_DISABLE_DMABUF_RENDERER: '1'
       - name: Verify building structures, large placement and saved upgrades
+        if: matrix.suite == 'roads' || matrix.engine == 'webkit'
         run: xvfb-run -a python3 tests/browser_buildings.py --engine "${{ matrix.engine }}"
         env:
           LIBGL_ALWAYS_SOFTWARE: '1'
           WEBKIT_DISABLE_DMABUF_RENDERER: '1'
       - name: Verify vehicle promotions and three-command transport cycles
+        if: matrix.suite == 'transport' || matrix.engine == 'webkit'
         run: xvfb-run -a python3 tests/browser_transport.py --engine "${{ matrix.engine }}"
         env:
           LIBGL_ALWAYS_SOFTWARE: '1'
           WEBKIT_DISABLE_DMABUF_RENDERER: '1'
       - name: Verify range tools and 128 carried logs
-        if: matrix.engine == 'chromium'
+        if: matrix.suite == 'tools'
         run: python3 tests/browser_tools.py
         env:
           LIBGL_ALWAYS_SOFTWARE: '1'
       - name: Verify Chrome installability, offline boot and saved updates
-        if: matrix.engine == 'chromium'
+        if: matrix.suite == 'pwa'
         run: python3 tests/browser_pwa.py
         env:
           LIBGL_ALWAYS_SOFTWARE: '1'
       - name: Verify freely placed facilities, processing, carts and touch construction
-        if: matrix.engine == 'chromium'
+        if: matrix.suite == 'facilities'
         run: python3 tests/browser_facilities.py
         env:
           LIBGL_ALWAYS_SOFTWARE: '1'
       - name: Play actual WebGL export
+        if: matrix.suite == 'game' || matrix.engine == 'webkit'
         run: xvfb-run -a python3 tests/browser_smoke.py --engine "${{ matrix.engine }}" ${{ matrix.flags }}
         env:
           LIBGL_ALWAYS_SOFTWARE: '1'
           WEBKIT_DISABLE_DMABUF_RENDERER: '1'
       - name: Verify expanded forests and map controls
-        if: matrix.engine == 'chromium'
+        if: matrix.suite == 'maps'
         run: python3 tests/browser_expansion.py
         env:
           LIBGL_ALWAYS_SOFTWARE: '1'
       - name: Verify highland terrain and world-map controls
-        if: matrix.engine == 'chromium'
+        if: matrix.suite == 'maps'
         run: python3 tests/browser_watersheds.py
         env:
           LIBGL_ALWAYS_SOFTWARE: '1'
@@ -139,7 +163,7 @@ jobs:
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: kikori-test-reports-${{ matrix.engine }}
+          name: kikori-test-reports-${{ matrix.engine }}-${{ matrix.suite }}
           path: reports/
 
   deploy:
