@@ -6,6 +6,7 @@ var ui
 var world
 var editing=false
 var placing=""
+var placing_large=false
 var placement_at=Vector2.ZERO
 var has_placement=false
 var tapped_site=""
@@ -60,16 +61,16 @@ func resize() -> void:
  confirm.position=Vector2(toolbar.position.x,size.y-132);confirm.size=Vector2(width,48)
 
 func start(at: Vector2) -> void:
- reset();placing="";editing=true;mode="build";draft_mode="build";world.planning=true;world.planning_focus=Defs.point(at)
+ reset();placing="";placing_large=false;editing=true;mode="build";draft_mode="build";world.planning=true;world.planning_focus=Defs.point(at)
  ui.show_menu(false);ui.show_logistics(false);ui.modal_open=false
  ui.menu_changed.emit(false);world.update_camera(0);update()
 
-func start_placement(kind: String) -> void:
+func start_placement(kind: String, large: bool = false) -> void:
  start(game.position+Vector2(-6,0))
- placing=kind;mode="build";update()
+ placing=kind;placing_large=large;mode="build";update()
 
 func finish() -> void:
- reset();editing=false;placing="";world.planning=false
+ reset();editing=false;placing="";placing_large=false;world.planning=false
  ui.menu_changed.emit(false);update()
 
 func select_mode(value: String) -> void:
@@ -138,8 +139,8 @@ func append_point(at: Vector2) -> void:
  if point==null: return
  if not placing.is_empty():
   placement_at=Vector2(point);has_placement=true
-  var valid=game.logistics.placement_ok(game,placing,placement_at)
-  world.facility_preview={"type":placing,"position":placement_at,"valid":valid}
+  var valid=game.logistics.placement_ok(game,placing,placement_at,placing_large)
+  world.facility_preview={"type":placing,"position":placement_at,"large":placing_large,"valid":valid}
   return
  var delta=point-stroke_origin
  if stroke_axis<0 and maxi(absi(delta.x),absi(delta.y))>=2: stroke_axis=0 if absi(delta.x)>=absi(delta.y) else 1
@@ -165,7 +166,8 @@ func hit_site(at: Vector2) -> String:
   var roof=Defs.point(game.logistics.footprint(item).get_center(),1.0)
   var screen=world.camera.unproject_position(roof)
   var port=world.camera.unproject_position(Defs.point(item.position,0.5))
-  var radius=clampf(get_viewport().get_visible_rect().size.y/world.camera.size*1.7,22,58)
+  var scale=game.logistics.site_scale(item)
+  var radius=clampf(get_viewport().get_visible_rect().size.y/world.camera.size*1.7*scale,22,58*scale)
   var d=minf(screen.distance_to(at),port.distance_to(at))
   if d<radius and d<distance: nearest=item.id;distance=d
  return nearest
@@ -259,7 +261,7 @@ func commit() -> void:
  update()
 
 func commit_placement() -> void:
- if has_placement and game.logistics.build(game,placing,placement_at):
+ if has_placement and game.logistics.build(game,placing,placement_at,placing_large):
   var id=game.logistics.sites.back().id
   applied.emit();finish();ui.show_site(id)
  ui.toast(game.logistics.message);update()
@@ -272,8 +274,8 @@ func update(delta: float = 0.0) -> void:
  confirm.visible=editing and not ui.modal_open and (not preview.is_empty() or has_placement)
  confirm.text="%dマス撤去を確定" % preview.size() if draft_mode=="remove" else "道を確定 · %d（所持 %d）" % [cost(),game.money]
  if not placing.is_empty():
-  confirm.text="建設を確定 · %d" % game.logistics.price(placing)
-  confirm.disabled=not has_placement or not game.logistics.placement_ok(game,placing,placement_at) or game.money<game.logistics.price(placing)
+  confirm.text=("大型建設を確定 · %d" if placing_large else "建設を確定 · %d") % game.logistics.price(placing,0,placing_large)
+  confirm.disabled=not has_placement or not game.logistics.placement_ok(game,placing,placement_at,placing_large) or game.money<game.logistics.price(placing,0,placing_large)
  else: confirm.disabled=false
  actions[0].text="配置" if not placing.is_empty() else "敷設"
  actions[1].visible=placing.is_empty()
@@ -294,7 +296,7 @@ func cost() -> int:
  return unique.size()*game.logistics.ROAD_PRICE
 
 func summary() -> Dictionary:
- var result={"road_editing":editing,"road_mode":mode,"road_preview_count":preview.size(),"road_preview":[],"road_shape":"corner" if orthogonal else "straight","road_cost":cost(),"road_history":history.size(),"planning_focus":[world.planning_focus.x,world.planning_focus.z],"placing":placing,"placement_at":[placement_at.x,placement_at.y],"has_placement":has_placement}
+ var result={"road_editing":editing,"road_mode":mode,"road_preview_count":preview.size(),"road_preview":[],"road_shape":"corner" if orthogonal else "straight","road_cost":cost(),"road_history":history.size(),"planning_focus":[world.planning_focus.x,world.planning_focus.z],"placing":placing,"placing_large":placing_large,"placement_at":[placement_at.x,placement_at.y],"has_placement":has_placement}
  for p in preview: result.road_preview.append([p.x,p.y])
  var nodes={"road_confirm":confirm,"road_undo":undo_button,"road_clear":clear_button,"road_shape":shape_button}
  # Keep the shape value and button coordinates under separate names.

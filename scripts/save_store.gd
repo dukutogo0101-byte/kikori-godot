@@ -2,7 +2,9 @@ extends RefCounted
 ## localStorage is synchronous, durable across reloads, and independent of IndexedDB flushes.
 const KEY = "kikori.watersheds.v5"
 const FILE = "user://kikori_watersheds_v5.json"
-const MAX_BYTES = 4000000
+const MAX_BYTES = 64000000
+const MAX_STORED_CHARS = 2400000
+const PREFIX = "KZ1:"
 var available = true
 var message = ""
 var file_path = FILE
@@ -24,7 +26,18 @@ func read_save() -> Dictionary:
 		raw = FileAccess.get_file_as_string(file_path)
 	if raw.is_empty():
 		return {}
-	if raw.length() > MAX_BYTES:
+	if raw.begins_with(PREFIX):
+		if raw.length() > MAX_STORED_CHARS:
+			message = "保存データを読み込めませんでした。"
+			return {}
+		var packed = Marshalls.base64_to_raw(raw.substr(PREFIX.length()))
+		# Bound expansion before parsing; never allocate from an untrusted length.
+		var decoded = packed.decompress_dynamic(MAX_BYTES, FileAccess.COMPRESSION_GZIP)
+		if decoded.is_empty():
+			message = "保存データが破損しています。新しく開始します。"
+			return {}
+		raw = decoded.get_string_from_utf8()
+	if raw.to_utf8_buffer().size() > MAX_BYTES:
 		message = "保存データを読み込めませんでした。"
 		return {}
 	var parser = JSON.new()
@@ -38,7 +51,14 @@ func write_save(state: Dictionary) -> bool:
 	var payload = state.duplicate(true)
 	payload["saved_at"] = Time.get_unix_time_from_system()
 	var raw = JSON.stringify(payload, "", true, true)
-	if raw.length() > MAX_BYTES:
+	if raw.to_utf8_buffer().size() > MAX_BYTES:
+		available = false
+		message = "保存データが大きすぎます。既存の保存は保持されています。"
+		return false
+	# Keep synchronous save acknowledgement while fitting large physical stocks
+	# inside mobile localStorage. Existing plain JSON remains readable.
+	raw = PREFIX + Marshalls.raw_to_base64(raw.to_utf8_buffer().compress(FileAccess.COMPRESSION_GZIP))
+	if raw.length() > MAX_STORED_CHARS:
 		available = false
 		message = "保存データが大きすぎます。既存の保存は保持されています。"
 		return false

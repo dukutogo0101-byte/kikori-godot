@@ -71,7 +71,7 @@ func _ready() -> void:
   window.addEventListener("kikori-web-modal-change",web_modal_callback)
   _visibility([])
   diagnostics()
- if restored and data.get("version")!=8: _save()
+ if restored and data.get("version")!=9: _save()
  if native_smoke:
   print("KIKORI_ADVENTURE_READY trees=%d objects=%s" % [game.trees.size(),world.counts()])
   get_tree().create_timer(2).timeout.connect(func(): get_tree().quit())
@@ -120,7 +120,9 @@ func ui_summary() -> Dictionary:
 
 func _logistics_action(kind: String, value) -> void:
  if kind=="place":
-  roads.start_placement(str(value));world.update(0);return
+  if value is Dictionary: roads.start_placement(str(value.type),bool(value.large))
+  else: roads.start_placement(str(value))
+  world.update(0);return
  if kind=="editor" or kind=="focus":
   var place=game.logistics.endpoint(game,str(value)) if kind=="focus" else {}
   var at=place.get("position",game.position+Vector2(-4,0))

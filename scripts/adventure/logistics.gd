@@ -27,6 +27,9 @@ const FACILITIES = {
  "processor":{"name":"加工所","price":320,"color":"609db7"},
  "factory":{"name":"製品工場","price":600,"color":"bd9362"}
 }
+const STRUCTURES = ["木造","石造","鉄骨造"]
+const SITE_CAPACITIES = [[64,128,192,256,320],[512,640,768,896,1024],[1536,1792,2048,2304,2560]]
+const SITE_POWER = [0,6,18]
 const STAGES = ["丸太","加工材","製品"]
 var sites: Array = []
 var next_site = 1
@@ -48,8 +51,57 @@ static func line(a: Vector2i, b: Vector2i) -> Array:
   result.append(p)
  return result
 
-func make_site(id: String, kind: String, at: Vector2, level: int = 1) -> Dictionary:
- return {"id":id,"type":kind,"position":at,"level":level,"paid":0,"legacy_depot":false,"input":[],"output":[],"clock":0.0,"mode":"deposit","worker_enabled":true,"worker":{"position":at,"target":-1,"clock":0.0,"wait":0.0,"cargo":[],"path":[],"cursor":0,"return_path":[],"phase":"idle","status":"木を探しています"}}
+func make_worker(at: Vector2) -> Dictionary:
+ return {"position":at,"target":-1,"clock":0.0,"wait":0.0,"cargo":[],"path":[],"cursor":0,"return_path":[],"phase":"idle","status":"木を探しています"}
+
+func make_site(id: String, kind: String, at: Vector2, level: int = 1, tier: int = 0, large: bool = false) -> Dictionary:
+ var result={"id":id,"type":kind,"position":at,"level":level,"tier":tier,"large":large,"free_steps":0,"paid":0,"legacy_depot":false,"input":[],"output":[],"clock":0.0,"mode":"deposit","worker_enabled":true,"worker":make_worker(at),"crew":[]}
+ if large and kind=="storage":
+  for i in 5: result.crew.append(make_worker(at))
+ return result
+
+func workers(item: Dictionary) -> Array:
+ return [item.worker]+item.get("crew",[])
+
+func site_scale(item: Dictionary) -> float:
+ return 2.0 if item.get("large",false) else 1.0
+
+func site_factor(item: Dictionary) -> int:
+ return 6 if item.get("large",false) else 1
+
+func site_power(item: Dictionary) -> int:
+ return SITE_POWER[int(item.get("tier",0))]+int(item.level)
+
+func processing_interval(item: Dictionary) -> float:
+ return 6.0/(site_power(item)*site_factor(item))
+
+func worker_speed(item: Dictionary) -> float:
+ return 3.0+site_power(item)*0.4
+
+func worker_radius(item: Dictionary) -> float:
+ return minf(63,12.0+site_power(item)*5)
+
+func site_name(item: Dictionary) -> String:
+ return ("大型 " if item.get("large",false) else "")+FACILITIES[item.type].name
+
+func site_maxed(item: Dictionary) -> bool:
+ return item.get("tier",0)==2 and item.level==5
+
+func site_upgrade_price(item: Dictionary) -> int:
+ var tier=int(item.get("tier",0));var factor=5 if item.get("large",false) else 1
+ if item.level==5: return int(FACILITIES[item.type].price)*[30,300,0][tier]*factor
+ return int(round(FACILITIES[item.type].price*pow(10,tier)*pow(1.8,item.level)))*factor
+
+func site_step_price(item: Dictionary, step: int) -> int:
+ if step==0: return price(item.type,0,item.get("large",false))
+ var previous=make_site("cost",item.type,Vector2.ZERO,(step-1)%5+1,floori(float(step-1)/5),item.get("large",false))
+ return site_upgrade_price(previous)
+
+func site_paid_expected(item: Dictionary) -> int:
+ var result=0
+ for step in range(int(item.get("free_steps",0)),int(item.get("tier",0))*5+int(item.level)):
+  result+=site_step_price(item,step)
+ return result
 
 func site(id: String) -> Dictionary:
  for item in sites:
@@ -58,21 +110,26 @@ func site(id: String) -> Dictionary:
 
 func capacity(id: String) -> int:
  var item=site(id)
- return 64*int(item.level) if not item.is_empty() else 0
+ return int(SITE_CAPACITIES[int(item.get("tier",0))][int(item.level)-1])*site_factor(item) if not item.is_empty() else 0
 
 func footprint(item: Dictionary) -> Rect2:
- return Rect2(item.position+Vector2(-4.2,2.9),Vector2(2.8,2.6)) if item.legacy_depot else Rect2(item.position+Vector2(-1.6,-3.8),Vector2(3.2,2.2))
+ var scale=site_scale(item)
+ return Rect2(item.position+Vector2(-4.2,2.9)*scale,Vector2(2.8,2.6)*scale) if item.legacy_depot else Rect2(item.position+Vector2(-1.6,-3.8)*scale,Vector2(3.2,2.2)*scale)
 
-func price(kind: String, level: int = 0) -> int:
- return int(round(FACILITIES[kind].price*pow(1.8,level))) if FACILITIES.has(kind) else 0
+func price(kind: String, level: int = 0, large: bool = false) -> int:
+ return int(round(FACILITIES[kind].price*pow(1.8,level)))*(5 if large else 1) if FACILITIES.has(kind) else 0
 
-func placement_ok(game, kind: String, at: Vector2) -> bool:
+func placement_ok(game, kind: String, at: Vector2, large: bool = false) -> bool:
  if not FACILITIES.has(kind) or sites.size()>=MAX_SITES: message="設備は16棟まで配置できます";return false
  if at!=Vector2(cell(at)): message="設備は地面のマスに合わせて配置します";return false
- var draft=make_site("preview",kind,at)
+ var draft=make_site("preview",kind,at,1,0,large)
  var rect=footprint(draft).grow(0.5)
- # Both the building and its loading court must lie on accessible dry land.
- for offset in [Vector2(-2,-4.3),Vector2(2,-4.3),Vector2(-2,-1.1),Vector2(2,-1.1),Vector2(-1,0),Vector2(1,0),Vector2(0,1)]:
+ # Sample the entire lot, including interior water/shore pockets, not only
+ # corners. The loading port remains at the same road cell for both sizes.
+ var offsets=[Vector2(-1,0),Vector2(1,0),Vector2(0,1)]
+ for x in range(ceili(rect.size.x*2)+1):
+  for y in range(ceili(rect.size.y*2)+1): offsets.append(rect.position-at+Vector2(minf(x*0.5,rect.size.x),minf(y*0.5,rect.size.y)))
+ for offset in offsets:
   var land=false
   for area in 3:
    if game.area_open(area) and Defs.in_area(at+offset,area,0.4): land=true
@@ -82,9 +139,10 @@ func placement_ok(game, kind: String, at: Vector2) -> bool:
  if rect.grow(0.35).has_point(game.position): message="主人公に重ならない場所を選んでください";return false
  for item in sites:
   if at.distance_to(item.position)<4.5 or rect.has_point(item.position) or footprint(item).grow(1.3).has_point(at): message="荷下ろし場の周囲を空けてください";return false
-  if rect.grow(0.5).has_point(item.worker.position): message="作業員がいる場所には建てられません";return false
-  for p in item.worker.path+item.worker.return_path:
-   if rect.has_point(Vector2(p)): message="作業員の通路を空けてください";return false
+  for worker in workers(item):
+   if rect.grow(0.5).has_point(worker.position): message="作業員がいる場所には建てられません";return false
+   for p in worker.path+worker.return_path:
+    if rect.has_point(Vector2(p)): message="作業員の通路を空けてください";return false
  for tree in game.trees:
   if tree.hp>0 and (rect.grow(0.8).has_point(tree.position) or tree.position.distance_to(at)<1.5): message="先に木を伐採して敷地を空けてください";return false
  for p in network(game):
@@ -97,11 +155,11 @@ func placement_ok(game, kind: String, at: Vector2) -> bool:
  message="配置できます"
  return true
 
-func build(game, kind: String, at: Vector2) -> bool:
- if not placement_ok(game,kind,at): return false
- if game.money<price(kind): message="設備の建設資金が足りません";return false
- var item=make_site("site%d" % next_site,kind,at)
- item.paid=price(kind);game.money-=item.paid
+func build(game, kind: String, at: Vector2, large: bool = false) -> bool:
+ if not placement_ok(game,kind,at,large): return false
+ if game.money<price(kind,0,large): message="設備の建設資金が足りません";return false
+ var item=make_site("site%d" % next_site,kind,at,1,0,large)
+ item.paid=price(kind,0,large);game.money-=item.paid
  sites.append(item);next_site+=1
  revision+=1;invalidate_navigation();_paths.clear()
  message=FACILITIES[kind].name+"を建設しました。タップで設定・強化できます"
@@ -109,17 +167,21 @@ func build(game, kind: String, at: Vector2) -> bool:
 
 func upgrade(game, id: String) -> bool:
  var item=site(id)
- if item.is_empty() or item.level>=3: return false
- var cost=price(item.type,item.level)
+ if item.is_empty(): return false
+ if site_maxed(item): message="鉄骨造は最高レベルです";return false
+ var cost=site_upgrade_price(item)
  if game.money<cost: message="強化資金が足りません";return false
- game.money-=cost;item.paid+=cost;item.level+=1;item.clock=minf(item.clock,6.0/item.level)
- message="%s Lv.%d！" % [FACILITIES[item.type].name,item.level]
+ game.money-=cost;item.paid+=cost
+ if item.level==5: item.tier+=1;item.level=1
+ else: item.level+=1
+ item.clock=minf(item.clock,processing_interval(item))
+ message="%s %s Lv.%d！" % [site_name(item),STRUCTURES[item.tier],item.level]
  return true
 
 func endpoints(_game) -> Array:
  var list=[]
  for item in sites:
-  list.append({"id":item.id,"name":FACILITIES[item.type].name+" "+item.id,"position":item.position,"type":item.type,"area":0})
+  list.append({"id":item.id,"name":site_name(item)+" "+item.id,"position":item.position,"type":item.type,"area":0})
  list.append({"id":"market0","name":"中央基地・出荷場","position":Defs.SALE,"type":"market","area":0})
  return list
 
@@ -147,8 +209,9 @@ func reserved(id: String, except_id: int = -1) -> int:
   if cart.id!=except_id and cart.destination==id: count+=cart.cargo.size()
  var item=site(id)
  if not item.is_empty() and item.type=="storage":
-  count+=item.worker.cargo.size()
-  if item.worker.cargo.is_empty() and item.worker.target>=0: count+=5
+  for worker in workers(item):
+   count+=worker.cargo.size()
+   if worker.cargo.is_empty() and worker.target>=0: count+=5
  return count
 
 func free_space(id: String, except_id: int = -1) -> int:
@@ -265,9 +328,10 @@ func edit_roads(game, cells: Array, remove: bool = false) -> bool:
 func blocks_regrowth(at: Vector2) -> bool:
  for item in sites:
   if footprint(item).grow(1.0).has_point(at) or item.position.distance_to(at)<1.8: return true
-  if item.worker.position.distance_to(at)<1.1: return true
-  for p in item.worker.path+item.worker.return_path:
-   if Vector2(p).distance_to(at)<1.25: return true
+  for worker in workers(item):
+   if worker.position.distance_to(at)<1.1: return true
+   for p in worker.path+worker.return_path:
+    if Vector2(p).distance_to(at)<1.25: return true
  var center=cell(at)
  for x in range(-2,3):
   for y in range(-2,3):
@@ -508,7 +572,9 @@ func player_transfer(game, id: String, dt: float) -> void:
 func held(kind: int) -> int:
  var total=0
  for item in sites:
-  for list in [item.input,item.output,item.worker.cargo]:
+  var lists=[item.input,item.output]
+  for worker in workers(item): lists.append(worker.cargo)
+  for list in lists:
    for log in list: total+=1 if log.kind==kind else 0
  for cart in carts:
   for log in cart.cargo: total+=1 if log.kind==kind else 0
@@ -527,13 +593,16 @@ func can_walk(game, p: Vector2i) -> bool:
  if not _walk_cache.has(p): _walk_cache[p]=game.walkable(Vector2(p))
  return _walk_cache[p]
 
-func find_job(game, item: Dictionary) -> bool:
- var worker=item.worker
- var radius=12.0+item.level*5
+func find_job(game, item: Dictionary, worker: Dictionary) -> bool:
+ var radius=worker_radius(item)
+ var claimed={}
+ for other in sites:
+  for colleague in workers(other):
+   if colleague!=worker and colleague.target>=0: claimed[int(colleague.target)]=true
  var goals={}
  for i in game.trees.size():
   var tree=game.trees[i]
-  if tree.hp<=0 or not game.area_open(tree.kind) or tree.position.distance_to(item.position)>radius: continue
+  if claimed.has(i) or tree.hp<=0 or not game.area_open(tree.kind) or tree.position.distance_to(item.position)>radius: continue
   # Reach the trunk from any clear cardinal or diagonal approach.
   var center=cell(tree.position)
   for x in range(-1,2):
@@ -580,56 +649,61 @@ func tick_production(game, dt: float) -> void:
   if item.type!="storage":
    if item.input.is_empty() or item.output.size()>=capacity(item.id): continue
    item.clock+=dt
-   var interval=6.0/item.level
+   var interval=processing_interval(item)
    while item.clock>=interval and not item.input.is_empty() and item.output.size()<capacity(item.id):
     var log=item.input.pop_front();log.stage=int(log.get("stage",0))+1;item.output.append(log);item.clock-=interval
    item.clock=minf(item.clock,interval)
    continue
-  var worker=item.worker
-  if worker.phase=="returning":
-   worker.status="集積所へ納品中"
-   if not worker_advance(game,worker,dt,3.0+item.level*0.4): continue
-   item.output.append_array(worker.cargo);worker.cargo.clear();worker.path=[];worker.return_path=[];worker.cursor=0;worker.target=-1;worker.phase="idle"
-  if worker.phase=="idle":
-   worker.status="休止中" if not item.worker_enabled else "木を探しています"
-   if not item.worker_enabled: continue
-   worker.wait=maxf(0,worker.wait-dt)
-   if worker.wait>0: continue
-   worker.wait=2.0
-   if free_space(item.id)<5: worker.status="集積所の空き待ち";continue
-   if not find_job(game,item): worker.status="近くに伐採できる木がありません";continue
-  if worker.phase=="walking":
-   worker.status="木へ移動中"
-   if not worker_advance(game,worker,dt,3.0+item.level*0.4): continue
-   worker.phase="cutting"
-  if worker.phase=="cutting":
-   var tree=game.trees[worker.target]
-   if tree.hp<=0 or not item.worker_enabled:
-    worker.phase="returning";worker.path=worker.return_path.duplicate();worker.cursor=1;worker.target=-1;continue
-   worker.status="伐採中";worker.clock+=dt
-   if worker.clock<0.65: continue
-   worker.clock-=0.65
-   if game.ground.size()+Defs.KINDS[tree.kind]["yield"]>Defs.MAX_GROUND: continue
-   tree.hp=maxi(0,tree.hp-int(item.level))
-   game.events.append({"type":"auto_hit","position":tree.position,"tree":worker.target})
-   if tree.hp>0: continue
-   var first=game.next_id
-   game.fell(worker.target)
-   for i in range(game.ground.size()-1,-1,-1):
-    var log=game.ground[i]
-    if log.id>=first:
-     worker.cargo.append({"id":log.id,"kind":log.kind,"quality":log.quality,"stage":0});game.ground.remove_at(i)
-   worker.phase="returning";worker.path=worker.return_path.duplicate();worker.cursor=1;worker.target=-1
+  for worker in workers(item):
+   if worker.phase=="returning":
+    worker.status="集積所へ納品中"
+    if not worker_advance(game,worker,dt,worker_speed(item)): continue
+    item.output.append_array(worker.cargo);worker.cargo.clear();worker.path=[];worker.return_path=[];worker.cursor=0;worker.target=-1;worker.phase="idle"
+   if worker.phase=="idle":
+    worker.status="休止中" if not item.worker_enabled else "木を探しています"
+    if not item.worker_enabled: continue
+    worker.wait=maxf(0,worker.wait-dt)
+    if worker.wait>0: continue
+    worker.wait=2.0
+    if free_space(item.id)<5: worker.status="集積所の空き待ち";continue
+    if not find_job(game,item,worker): worker.status="近くに伐採できる木がありません";continue
+   if worker.phase=="walking":
+    worker.status="木へ移動中"
+    if not worker_advance(game,worker,dt,worker_speed(item)): continue
+    worker.phase="cutting"
+   if worker.phase=="cutting":
+    var tree=game.trees[worker.target]
+    if tree.hp<=0 or not item.worker_enabled:
+     worker.phase="returning";worker.path=worker.return_path.duplicate();worker.cursor=1;worker.target=-1;continue
+    worker.status="伐採中";worker.clock+=dt
+    if worker.clock<0.65: continue
+    worker.clock-=0.65
+    if game.ground.size()+Defs.KINDS[tree.kind]["yield"]>Defs.MAX_GROUND: continue
+    tree.hp=maxi(0,tree.hp-site_power(item))
+    game.events.append({"type":"auto_hit","position":tree.position,"tree":worker.target})
+    if tree.hp>0: continue
+    var first=game.next_id
+    game.fell(worker.target)
+    for i in range(game.ground.size()-1,-1,-1):
+     var log=game.ground[i]
+     if log.id>=first:
+      worker.cargo.append({"id":log.id,"kind":log.kind,"quality":log.quality,"stage":0});game.ground.remove_at(i)
+    worker.phase="returning";worker.path=worker.return_path.duplicate();worker.cursor=1;worker.target=-1
+
+func worker_snapshot(worker: Dictionary) -> Dictionary:
+ var copy=worker.duplicate(true);copy.position=[worker.position.x,worker.position.y]
+ copy.path=[];copy.return_path=[];copy.erase("status")
+ for p in worker.path: copy.path.append([p.x,p.y])
+ for p in worker.return_path: copy.return_path.append([p.x,p.y])
+ return copy
 
 func snapshot() -> Dictionary:
  var data={"roads":[],"road_paid":road_paid,"sites":[],"next_site":next_site,"carts":[]}
  for p in roads: data.roads.append([p.x,p.y])
  for item in sites:
   var copy=item.duplicate(true);copy.position=[item.position.x,item.position.y]
-  copy.worker.position=[item.worker.position.x,item.worker.position.y]
-  copy.worker.path=[];copy.worker.return_path=[];copy.worker.erase("status")
-  for p in item.worker.path: copy.worker.path.append([p.x,p.y])
-  for p in item.worker.return_path: copy.worker.return_path.append([p.x,p.y])
+  copy.worker=worker_snapshot(item.worker);copy.crew=[]
+  for worker in item.get("crew",[]): copy.crew.append(worker_snapshot(worker))
   data.sites.append(copy)
  for cart in carts:
   var copy=cart.duplicate(true)
@@ -659,7 +733,29 @@ func restore_path(game, raw, out: Array, road_only: bool = false) -> bool:
   out.append(p)
  return true
 
-func restore(game, data, ids: Dictionary, total: int, legacy: bool = false) -> bool:
+func restore_worker(game, item: Dictionary, raw, w: Dictionary, ids: Dictionary, total: int) -> bool:
+ if not raw is Dictionary or not game.pair(raw.get("position")) or not game.number(raw.get("clock"),0,0.65) or not game.number(raw.get("wait"),0,2): return false
+ if raw.get("phase") not in ["idle","walking","cutting","returning"] or not game.number(raw.get("target"),-1,game.trees.size()-1,true): return false
+ w.position=Vector2(raw.position[0],raw.position[1]);w.phase=raw.phase;w.clock=float(raw.clock);w.wait=float(raw.wait);w.target=int(raw.target)
+ if not game.walkable(w.position): return false
+ if not restore_logs(game,raw.get("cargo"),w.cargo,5 if item.type=="storage" else 0,ids,total,0): return false
+ if not restore_path(game,raw.get("path"),w.path) or not restore_path(game,raw.get("return_path"),w.return_path): return false
+ if not game.number(raw.get("cursor"),0,w.path.size(),true): return false
+ w.cursor=int(raw.cursor)
+ if item.type!="storage" and (w.phase!="idle" or not w.cargo.is_empty()): return false
+ if w.phase=="idle":
+  if not w.path.is_empty() or not w.return_path.is_empty() or not w.cargo.is_empty() or w.target!=-1 or w.position.distance_to(item.position)>0.002: return false
+ else:
+  if w.path.is_empty() or w.return_path.is_empty() or w.cursor<1 or w.cursor>w.path.size(): return false
+  if Vector2(w.return_path.back()).distance_to(item.position)>0.002: return false
+  if w.phase in ["walking","cutting"] and w.target<0: return false
+  if w.phase=="returning" and w.target!=-1: return false
+  if w.cursor<w.path.size() and Geometry2D.get_closest_point_to_segment(w.position,Vector2(w.path[w.cursor-1]),Vector2(w.path[w.cursor])).distance_to(w.position)>0.002: return false
+  if w.cursor==w.path.size() and w.position.distance_to(Vector2(w.path.back()))>0.002: return false
+  if w.phase=="cutting" and (w.cursor!=w.path.size() or w.position.distance_to(game.trees[w.target].position)>1.71): return false
+ return true
+
+func restore(game, data, ids: Dictionary, total: int, legacy: bool = false, old_sites: bool = false) -> bool:
  if not data is Dictionary or not data.get("sites") is Array or data.sites.size()>MAX_SITES: return false
  if not game.number(data.get("next_site"),1,1e6,true): return false
  next_site=int(data.next_site)
@@ -669,11 +765,16 @@ func restore(game, data, ids: Dictionary, total: int, legacy: bool = false) -> b
   if not raw.id.begins_with("site") and raw.id not in ["camp0","camp1","camp2","depot0","depot1","depot2"]: return false
   if raw.id.begins_with("site") and (not raw.id.substr(4).is_valid_int() or int(raw.id.substr(4))<1 or int(raw.id.substr(4))>=next_site): return false
   names[raw.id]=true
-  if not FACILITIES.has(raw.get("type")) or not game.pair(raw.get("position")) or not game.number(raw.get("level"),1,3,true): return false
+  if not FACILITIES.has(raw.get("type")) or not game.pair(raw.get("position")) or not game.number(raw.get("level"),1,3 if old_sites else 5,true): return false
   if not raw.get("legacy_depot") is bool or not raw.get("worker_enabled") is bool or raw.get("mode") not in ["deposit","withdraw"]: return false
-  var item=make_site(raw.id,raw.type,Vector2(raw.position[0],raw.position[1]),int(raw.level))
+  if not old_sites and (not game.number(raw.get("tier"),0,2,true) or not raw.get("large") is bool or not game.number(raw.get("free_steps"),0,3,true)): return false
+  var item=make_site(raw.id,raw.type,Vector2(raw.position[0],raw.position[1]),int(raw.level),0 if old_sites else int(raw.tier),false if old_sites else raw.large)
+  item.free_steps=0 if old_sites else int(raw.free_steps)
+  if item.free_steps>item.tier*5+item.level: return false
   if item.position!=Vector2(cell(item.position)): return false
-  item.legacy_depot=raw.legacy_depot;item.worker_enabled=raw.worker_enabled;item.mode=raw.mode
+  item.legacy_depot=raw.legacy_depot
+  if item.large and (item.legacy_depot or item.free_steps!=0): return false
+  item.worker_enabled=raw.worker_enabled;item.mode=raw.mode
   var legal=false
   for area in 3:
    if game.area_open(area) and Defs.in_area(item.position,area,0.4): legal=true
@@ -684,49 +785,38 @@ func restore(game, data, ids: Dictionary, total: int, legacy: bool = false) -> b
   # Buildings may cover felled trees, but never a live trunk.
   for tree in game.trees:
    if tree.hp>0 and rect.grow(0.76).has_point(tree.position): return false
-  for offset in [Vector2.ZERO,rect.position-item.position,rect.end-item.position]:
+  var land_offsets=[Vector2.ZERO,rect.position-item.position,rect.end-item.position]
+  if item.large:
+   var lot=rect.grow(0.5)
+   for x in range(ceili(lot.size.x*2)+1):
+    for y in range(ceili(lot.size.y*2)+1): land_offsets.append(lot.position-item.position+Vector2(minf(x*0.5,lot.size.x),minf(y*0.5,lot.size.y)))
+  for offset in land_offsets:
    var on_land=false
    for area in 3:
     if game.area_open(area) and Defs.in_area(item.position+offset,area,0.2): on_land=true
    if not on_land: return false
-  if not game.number(raw.get("clock"),0,6.0/item.level) or not game.number(raw.get("paid"),0,1e7,true): return false
-  var full_price=0
-  for level in item.level: full_price+=price(item.type,level)
-  # Migrated free buildings may subsequently receive paid upgrades.
-  var allowed=false
-  for first in range(item.level+1):
-   var paid=0
-   for level in range(first,item.level): paid+=price(item.type,level)
-   if raw.paid==paid: allowed=true
-  if not allowed: return false
+  if not game.number(raw.get("clock"),0,processing_interval(item)) or not game.number(raw.get("paid"),0,1e9,true): return false
+  if old_sites:
+   var allowed=false
+   for first in range(item.level+1):
+    item.free_steps=first
+    if raw.paid==site_paid_expected(item): allowed=true;break
+   if not allowed: return false
+  elif raw.paid!=site_paid_expected(item): return false
   item.paid=int(raw.paid);item.clock=float(raw.clock)
   sites.append(item)
   var input_stage=0 if item.type=="processor" else 1
   var output_stage=1 if item.type=="processor" else 2
   if not restore_logs(game,raw.get("input"),item.input,0 if item.type=="storage" else capacity(item.id),ids,total,input_stage): return false
   if not restore_logs(game,raw.get("output"),item.output,capacity(item.id),ids,total,-1 if item.type=="storage" else output_stage): return false
- # All buildings must exist before checking any saved worker path.
+ # Restore all six possible workers before checking aggregate reservations.
  for index in sites.size():
-  var item=sites[index];var raw=data.sites[index].get("worker")
-  if not raw is Dictionary or not game.pair(raw.get("position")) or not game.number(raw.get("clock"),0,0.65) or not game.number(raw.get("wait"),0,2): return false
-  if raw.get("phase") not in ["idle","walking","cutting","returning"] or not game.number(raw.get("target"),-1,game.trees.size()-1,true): return false
-  var w=item.worker;w.position=Vector2(raw.position[0],raw.position[1]);w.phase=raw.phase;w.clock=float(raw.clock);w.wait=float(raw.wait);w.target=int(raw.target)
-  if not game.walkable(w.position): return false
-  if not restore_logs(game,raw.get("cargo"),w.cargo,5 if item.type=="storage" else 0,ids,total,0): return false
-  if not restore_path(game,raw.get("path"),w.path) or not restore_path(game,raw.get("return_path"),w.return_path): return false
-  if not game.number(raw.get("cursor"),0,w.path.size(),true): return false
-  w.cursor=int(raw.cursor)
-  if item.type!="storage" and (w.phase!="idle" or not w.cargo.is_empty()): return false
-  if w.phase=="idle":
-   if not w.path.is_empty() or not w.return_path.is_empty() or not w.cargo.is_empty() or w.target!=-1 or w.position.distance_to(item.position)>0.002: return false
-  else:
-   if w.path.is_empty() or w.return_path.is_empty() or w.cursor<1 or w.cursor>w.path.size(): return false
-   if Vector2(w.return_path.back()).distance_to(item.position)>0.002: return false
-   if w.phase in ["walking","cutting"] and w.target<0: return false
-   if w.phase=="returning" and w.target!=-1: return false
-   if w.cursor<w.path.size() and Geometry2D.get_closest_point_to_segment(w.position,Vector2(w.path[w.cursor-1]),Vector2(w.path[w.cursor])).distance_to(w.position)>0.002: return false
-   if w.cursor==w.path.size() and w.position.distance_to(Vector2(w.path.back()))>0.002: return false
-   if w.phase=="cutting" and (w.cursor!=w.path.size() or w.position.distance_to(game.trees[w.target].position)>1.71): return false
+  var item=sites[index];var raw=data.sites[index]
+  if not restore_worker(game,item,raw.get("worker"),item.worker,ids,total): return false
+  if not old_sites:
+   if not raw.get("crew") is Array or raw.crew.size()!=item.crew.size(): return false
+   for i in item.crew.size():
+    if not restore_worker(game,item,raw.crew[i],item.crew[i],ids,total): return false
   if item.output.size()+reserved(item.id)>capacity(item.id): return false
  if not data.get("roads") is Array or data.roads.size()>MAX_ROADS or not game.number(data.get("road_paid"),data.roads.size(),1e7,true): return false
  road_paid=int(data.road_paid)

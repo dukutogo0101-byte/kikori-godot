@@ -19,6 +19,7 @@ timeout 180s "$GODOT_BIN" --headless --path . --script tests/test_automation.gd 
 timeout 180s "$GODOT_BIN" --headless --path . --script tests/test_watersheds.gd 2>&1 | tee reports/watersheds.log
 timeout 180s "$GODOT_BIN" --headless --path . --script tests/test_facilities.gd 2>&1 | tee reports/facilities.log
 timeout 180s "$GODOT_BIN" --headless --path . --script tests/test_transport.gd -- --smoke-test 2>&1 | tee reports/transport.log
+timeout 180s "$GODOT_BIN" --headless --path . --script tests/test_building_growth.gd -- --smoke-test 2>&1 | tee reports/buildings.log
 timeout 180s "$GODOT_BIN" --headless --path . --script tests/test_logistics.gd 2>&1 | tee reports/logistics.log
 python3 -c 'import re,sys; from pathlib import Path; sys.exit(any(re.search("SCRIPT ERROR|^ERROR:|failures=[1-9]", p.read_text(), re.M) for p in Path("reports").glob("*.log")))'
 timeout 180s "$GODOT_BIN" --headless --path . --script tests/test_road_building.gd -- --smoke-test 2>&1 | tee reports/road-building.log

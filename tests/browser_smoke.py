@@ -6,6 +6,7 @@ emulation/software rendering is not physical Android/iPhone certification.
 """
 import argparse
 import base64
+import gzip
 import json
 import hashlib
 import struct
@@ -312,7 +313,8 @@ def inspect(browser, url, engine, full):
         buy(page, 'cut_range')
         assert state(page)['capacity'] == 128 and state(page)['speed'] == 6.5
         capture(page, engine + '-upgrades')
-        saved = page.evaluate('(key) => JSON.parse(localStorage.getItem(key))', KEY)
+        raw_saved = page.evaluate('(key) => localStorage.getItem(key)', KEY)
+        saved = json.loads(gzip.decompress(base64.b64decode(raw_saved[4:])) if raw_saved.startswith('KZ1:') else raw_saved)
         page.reload()
         ready(page)
         assert state(page)['levels']['cut_range'] == 1 and state(page)['money'] == saved['money']

@@ -18,6 +18,8 @@ var close_button: Button
 var source_focus: Button
 var road_button: Button
 var build_buttons={}
+var large_build=false
+var size_button: Button
 
 func option() -> OptionButton:
  var node=OptionButton.new()
@@ -41,9 +43,10 @@ func setup(state, owner_ui) -> void:
  var body=VBoxContainer.new();body.size_flags_horizontal=Control.SIZE_EXPAND_FILL;body.add_theme_constant_override("separation",10);scroll.add_child(body)
  var help=ui.text("既存の道と完成した橋も荷車で通れます。設備の入口の円から道へ接続しよう。中間集積所 → 加工所 → 工場 → 中央基地。加工材は2倍、製品は4倍。設備をタップで強化。",14);help.autowrap_mode=TextServer.AUTOWRAP_WORD_SMART;body.add_child(help)
  road_button=ui.button("道路を作る・撤去する");road_button.pressed.connect(func():action.emit("editor",null));body.add_child(road_button)
+ size_button=ui.button("規模：通常");size_button.pressed.connect(func():large_build=not large_build;refresh());body.add_child(size_button)
  for kind in ["storage","processor","factory"]:
   var build=ui.button("%sを配置 · %d" % [game.logistics.FACILITIES[kind].name,game.logistics.price(kind)])
-  build.pressed.connect(func():action.emit("place",kind));body.add_child(build);build_buttons[kind]=build
+  build.pressed.connect(func():action.emit("place",{"type":kind,"large":large_build}));body.add_child(build);build_buttons[kind]=build
  info=ui.text("",14);info.autowrap_mode=TextServer.AUTOWRAP_WORD_SMART;body.add_child(info)
  body.add_child(ui.text("輸送車の運送命令",20))
  source=option();destination=option();body.add_child(source);body.add_child(destination)
@@ -99,8 +102,11 @@ func refresh() -> void:
   for i in choices.size():
    if choices[i].id==source_id: source.select(i)
    if choices[i].id==destination_id: destination.select(i)
- info.text="設備 %d / 16 棟 · 輸送車 %d / %d 台\n上限＝中央基地を含む全建物数＋1台\n新設道路 %d マス · 既存道と橋 %d マス\n加工所は丸太、工場は加工材のみ受け入れます。\n下の出発地・配送先を選び、各車の命令に追加・変更できます。" % [logistics.sites.size(),logistics.carts.size(),logistics.cart_limit(),logistics.roads.size(),logistics.public_roads(game).size()]
- for kind in build_buttons: build_buttons[kind].disabled=game.money<logistics.price(kind) or logistics.sites.size()>=16
+ info.text="設備 %d / 16 棟 · 輸送車 %d / %d 台\n上限＝中央基地を含む全建物数＋1台\n新設道路 %d マス · 既存道と橋 %d マス\n加工所は丸太、工場は加工材のみ受け入れます。\n大型：容量・加工速度6倍／木こり6人／費用5倍。\n設備は木造→石造→鉄骨造、各Lv.5まで。\n下で区間を選び、各車の命令を設定。" % [logistics.sites.size(),logistics.carts.size(),logistics.cart_limit(),logistics.roads.size(),logistics.public_roads(game).size()]
+ size_button.text="規模：大型（面積4倍）" if large_build else "規模：通常"
+ for kind in build_buttons:
+  build_buttons[kind].text="%s%sを配置 · %d" % ["大型 " if large_build else "",logistics.FACILITIES[kind].name,logistics.price(kind,0,large_build)]
+  build_buttons[kind].disabled=game.money<logistics.price(kind,0,large_build) or logistics.sites.size()>=16
  purchase.disabled=game.money<120 or logistics.carts.size()>=logistics.cart_limit() or source_id.is_empty()
  for i in routes.size():
   var row=routes[i];row.panel.visible=i<logistics.carts.size()
@@ -125,8 +131,8 @@ func refresh() -> void:
   row.clear.disabled=not can_change or cart.orders.is_empty()
 
 func summary() -> Dictionary:
- var result={"source_id":source_id,"destination_id":destination_id,"cart_limit":game.logistics.cart_limit()}
- var buttons={"road_editor":road_button,"log_close":close_button,"cart_buy":purchase,"route_source":source,"route_destination":destination,"source_focus":source_focus}
+ var result={"source_id":source_id,"destination_id":destination_id,"cart_limit":game.logistics.cart_limit(),"large_build":large_build}
+ var buttons={"build_size":size_button,"road_editor":road_button,"log_close":close_button,"cart_buy":purchase,"route_source":source,"route_destination":destination,"source_focus":source_focus}
  for kind in build_buttons: buttons["build_"+kind]=build_buttons[kind]
  for i in routes.size():
   buttons["cart_pause%d" % i]=routes[i].pause

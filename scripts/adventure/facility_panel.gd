@@ -31,16 +31,25 @@ func setup(state, owner_ui) -> void:
 func refresh() -> void:
  var network=game.logistics;var item=network.site(selected)
  if item.is_empty(): return
- title.text="%s Lv.%d" % [network.FACILITIES[item.type].name,item.level]
+ title.text=network.site_name(item)
+ title.add_theme_font_size_override("font_size",19)
  var counts=[0,0,0]
  for log in item.output: counts[int(log.get("stage",0))]+=1
- description.text="入口 (%d, %d) · %s\n保管：丸太 %d / 加工材 %d / 製品 %d\n出荷在庫 %d / %d 本\n入荷予定 %d 本" % [item.position.x,item.position.y,item.id,counts[0],counts[1],counts[2],item.output.size(),network.capacity(item.id),network.reserved(item.id)]
+ description.text="%s Lv.%d / 5 · %s\n入口 (%d, %d) · %s\n保管：丸太 %d / 加工材 %d / 製品 %d\n出荷在庫 %d / %d 本\n入荷予定 %d 本" % [network.STRUCTURES[item.tier],item.level,"大型：面積4倍・性能6倍" if item.large else "通常規模",item.position.x,item.position.y,item.id,counts[0],counts[1],counts[2],item.output.size(),network.capacity(item.id),network.reserved(item.id)]
  if item.type=="storage":
-  description.text+="\n木こり：%s · 運搬 %d 本\n伐採半径 %d m · 威力 %d" % [item.worker.status,item.worker.cargo.size(),12+item.level*5,item.level]
+  var crew=network.workers(item);var held=0;var working=0
+  for member in crew:
+   held+=member.cargo.size()
+   if member.phase!="idle": working+=1
+  description.text+="\n木こり %d 人（作業中 %d 人）· 運搬 %d 本\n%s\n伐採半径 %.0f m · 威力 %d" % [crew.size(),working,held,item.worker.status,network.worker_radius(item),network.site_power(item)]
  else:
-  description.text+="\n加工待ち %d / %d 本\n%s → %s · %.1f秒 / 本\n進捗 %d%% · 中央基地で売価 ×%d" % [item.input.size(),network.capacity(item.id),"丸太" if item.type=="processor" else "加工材","加工材" if item.type=="processor" else "製品",6.0/item.level,int(item.clock/(6.0/item.level)*100),2 if item.type=="processor" else 4]
- upgrade.text="強化 MAX" if item.level>=3 else "Lv.%d に強化 · %d" % [item.level+1,network.price(item.type,item.level)]
- upgrade.disabled=item.level>=3 or game.money<network.price(item.type,item.level)
+  var interval=network.processing_interval(item)
+  description.text+="\n加工待ち %d / %d 本\n%s → %s · %.3f秒 / 本\n進捗 %d%% · 中央基地で売価 ×%d" % [item.input.size(),network.capacity(item.id),"丸太" if item.type=="processor" else "加工材","加工材" if item.type=="processor" else "製品",interval,int(item.clock/interval*100),2 if item.type=="processor" else 4]
+ var cost=network.site_upgrade_price(item)
+ if network.site_maxed(item): upgrade.text="鉄骨造 Lv.5・最高レベル"
+ elif item.level==5: upgrade.text="%sへ更新 · %d" % [network.STRUCTURES[item.tier+1],cost]
+ else: upgrade.text="Lv.%d に強化 · %d" % [item.level+1,cost]
+ upgrade.disabled=network.site_maxed(item) or game.money<cost
  mode.text="手動：搬入中 → 取り出しに切替" if item.mode=="deposit" else "手動：取り出し中 → 搬入に切替"
  worker.visible=item.type=="storage";worker.text="木こりを休止する" if item.worker_enabled else "木こりを再開する"
 

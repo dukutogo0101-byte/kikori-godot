@@ -1,3 +1,15 @@
+# Building structures and large facilities (v9)
+
+Buildings have wood, stone and steel structures, each with five levels. Material promotion preserves the delivery cell, footprint and actual inventory. Existing v7/v8 levels 1–3 migrate to ordinary wooden facilities with their exact paid/free investment ledger; cart tiers, orders and cargo remain intact.
+
+Large facilities occupy twice the width and depth (four times the area). Capacity and processing rate are six times the matching ordinary facility; a large storage uses six independent physical workers. Construction, level upgrades and material promotions cost five times the corresponding ordinary price. Every worker participates in inventory conservation, destination reservations, navigation, regrowth blocking and save validation.
+
+The new native suite covers all 90 type/size/structure/level combinations, exact costs, maximum-level guards, stocked upgrades, migration, six-worker claims and delivery, one-hour capacity bounds, processing backpressure, footprint collision, hostile fields and compressed storage sized for the maximum fleet of buildings. Browser checks purchase large construction and stone/steel promotions with real touch input in Chromium and WebKit. Screenshots show the placement preview and upgraded structure. Actions results remain authoritative; physical-device performance is unmeasured.
+
+Saves retain their existing key and synchronous success acknowledgement. Gzip envelopes support larger stocks within a bounded persisted size, and the reader also accepts existing plain JSON saves. Decompression and JSON size are bounded; a failed write preserves the prior save.
+
+The sections below record earlier verification work.
+
 # Tools and installable app verification (v6)
 
 The current watershed save key is retained. Schema v5 is validated with its original purchase ledger before the retired pack/boots costs are refunded; the next write is v6. Existing terrain, timber IDs/quality, roads, carts, automation, projects, axe damage and position are retained. Both ordinary and JSON-number save round trips are covered. All 49 combinations of old pack/boots levels and repeated v6 reloads are checked.

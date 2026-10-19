@@ -409,7 +409,8 @@ func goods(kind: int, stage: int) -> Mesh:
   for z in [-0.25,0.25]: box(Vector3(0,0.1,z),Vector3(0.55,0.47,0.05),Color("607a7b"))
  return finish()
 
-func facility(kind: String) -> Mesh:
+func facility(kind: String, tier: int = 0) -> Mesh:
+ if tier>0: return strong_facility(kind,tier)
  begin("facility_"+kind)
  box(Vector3(0,0.1,0),Vector3(3.2,0.2,2.2),Color("8dada4"))
  if kind=="storage":
@@ -429,4 +430,48 @@ func facility(kind: String) -> Mesh:
   box(Vector3(1.05,2.3,-0.55),Vector3(0.4,1.1,0.45),Color("657c81"))
   for x in [-0.9,0.1,0.9]: box(Vector3(x,1.05,0.98),Vector3(0.55,0.6,0.06),Color("b9dce1"))
   box(Vector3(-0.2,0.6,1.03),Vector3(0.65,1.0,0.08),WOOD)
+ return finish()
+
+func strong_facility(kind: String, tier: int) -> Mesh:
+ begin("facility_%s_%d" % [kind,tier])
+ var stone=Color("aaa99c");var steel=Color("5f7b86");var trim=Color("d6c9a8")
+ var structural=stone if tier==1 else steel
+ box(Vector3(0,0.1,0),Vector3(3.2,0.2,2.2),structural.darkened(0.2))
+ for x in [-1.4,1.4]:
+  for z in [-0.9,0.9]:
+   box(Vector3(x,1.0,z),Vector3(0.28,1.8,0.28),structural)
+   if tier==1:
+    for y in [0.4,0.8,1.2,1.6]: box(Vector3(x,y,z),Vector3(0.3,0.05,0.3),trim)
+ if tier==1:
+  # Stone blocks, pale lintels and a slate roof remain distinct from timber.
+  for side in [-1,1]:
+   for row in 3:
+    for segment in 4:
+     box(Vector3(side*1.45,0.35+row*0.28,-0.72+segment*0.48),Vector3(0.18,0.25,0.44),stone.lightened(0.035*((row+segment)%3)))
+  box(Vector3(0,1.91,0),Vector3(3.4,0.2,2.4),Color("627d89"))
+  box(Vector3(0,1.55,1.01),Vector3(2.2,0.18,0.2),trim)
+ else:
+  # Exposed frame, diagonal bracing, sheet roof and amber safety edges.
+  for x in [-1.4,1.4]:
+   branch(Vector3(x,0.3,-0.8),Vector3(x,1.8,0.8),0.055,0.055,steel.lightened(0.2),5)
+   box(Vector3(x,1.85,0),Vector3(0.16,0.18,2.2),steel)
+  for z in [-0.9,0,0.9]: box(Vector3(0,1.95,z),Vector3(3.4,0.1,0.82),Color("477d90"))
+  for x in [-1.5,1.5]: box(Vector3(x,0.24,0),Vector3(0.08,0.1,2.1),Color("e4b654"))
+ if kind=="storage":
+  for x in [-0.9,-0.3,0.3,0.9]:
+   box(Vector3(x,0.35,0),Vector3(0.5,0.16,1.4),CUT)
+   if tier==2: box(Vector3(x,1.0,-0.4),Vector3(0.5,0.12,0.7),steel)
+ elif kind=="processor":
+  box(Vector3(0,0.6,0),Vector3(2.5,0.8,1.5),structural.darkened(0.18))
+  box(Vector3(0,1.07,0),Vector3(2.8,0.14,1.8),Color("c8d3cf"))
+  for z in [-0.5,0,0.5]: box(Vector3(0,1.2,z),Vector3(2.15,0.14,0.18),CUT)
+  box(Vector3(-0.8,1.45,-0.2),Vector3(0.2,0.8,1.0),steel)
+ else:
+  box(Vector3(0,0.95,0),Vector3(2.75,1.5,1.75),structural.darkened(0.1))
+  for x in [-0.95,0,0.95]:
+   box(Vector3(x,1.2,0.89),Vector3(0.6,0.5,0.04),Color("a7d4db"))
+  box(Vector3(0,0.65,0.93),Vector3(0.65,1.0,0.1),Color("376476"))
+  for x in [-0.95,0.95]:
+   box(Vector3(x,2.3,-0.65),Vector3(0.36,1.15,0.4),structural)
+   box(Vector3(x,2.75,-0.65),Vector3(0.4,0.12,0.44),trim if tier==1 else Color("e4b654"))
  return finish()
