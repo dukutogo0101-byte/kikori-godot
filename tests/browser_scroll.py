@@ -20,7 +20,9 @@ def run(browser,url):
                 cdp.send('Input.dispatchTouchEvent',{'type':'touchMove','touchPoints':[{'x':180,'y':start+(end-start)*i/12}]});page.wait_for_timeout(20)
             cdp.send('Input.dispatchTouchEvent',{'type':'touchEnd','touchPoints':[]});cdp.detach()
         else:
-            page.mouse.move(180,start);page.mouse.down();page.mouse.move(180,end,steps=12);page.mouse.up()
+            # GTK WebKit's mouse is not a touch device. Check its native wheel
+            # path; real touchscreen swipes above use Chromium's touch protocol.
+            page.mouse.move(180,start);page.mouse.wheel(0,120 if end<start else -120)
         page.wait_for_timeout(450)
     before=y();start=page.evaluate('window.kikoriUi.build_size.y')
     swipe(start,max(145,start-180))
@@ -34,7 +36,7 @@ def run(browser,url):
     assert page.evaluate('window.kikoriUi.logistics_open') and state(page)['money']==0
     capture(page,browser.browser_type.name+'-logistics-scroll')
     assert not errors,errors
-    print('KIKORI_SCROLL_BROWSER',json.dumps({'engine':browser.browser_type.name,'button_swipe':True,'reverse_swipe':True,'tap_preserved':True,'errors':errors}),flush=True)
+    print('KIKORI_SCROLL_BROWSER',json.dumps({'engine':browser.browser_type.name,'input':'touch' if browser.browser_type.name=='chromium' else 'wheel','scroll_over_buttons':True,'reverse_scroll':True,'tap_preserved':True,'errors':errors}),flush=True)
     context.close()
 
 def main():
