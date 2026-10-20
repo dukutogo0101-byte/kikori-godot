@@ -20,6 +20,7 @@ var road_button: Button
 var build_buttons={}
 var large_build=false
 var size_button: Button
+var scroll: ScrollContainer
 
 func option() -> OptionButton:
  var node=OptionButton.new()
@@ -39,7 +40,9 @@ func setup(state, owner_ui) -> void:
  var header=HBoxContainer.new();layout.add_child(header)
  var title=ui.text("建設・物流",22);title.size_flags_horizontal=Control.SIZE_EXPAND_FILL;header.add_child(title)
  close_button=ui.button("閉じる");close_button.pressed.connect(func():close_requested.emit());header.add_child(close_button)
- var scroll=ScrollContainer.new();scroll.horizontal_scroll_mode=ScrollContainer.SCROLL_MODE_DISABLED;scroll.size_flags_vertical=Control.SIZE_EXPAND_FILL;layout.add_child(scroll)
+ scroll=ScrollContainer.new();scroll.horizontal_scroll_mode=ScrollContainer.SCROLL_MODE_DISABLED;scroll.size_flags_vertical=Control.SIZE_EXPAND_FILL;layout.add_child(scroll)
+ scroll.scroll_deadzone=10
+ scroll.get_v_scroll_bar().custom_minimum_size.x=28
  var body=VBoxContainer.new();body.size_flags_horizontal=Control.SIZE_EXPAND_FILL;body.add_theme_constant_override("separation",10);scroll.add_child(body)
  var help=ui.text("既存の道と完成した橋も荷車で通れます。設備の入口の円から道へ接続しよう。中間集積所 → 加工所 → 工場 → 中央基地。加工材は2倍、製品は4倍。設備をタップで強化。",14);help.autowrap_mode=TextServer.AUTOWRAP_WORD_SMART;body.add_child(help)
  road_button=ui.button("道路を作る・撤去する");road_button.pressed.connect(func():action.emit("editor",null));body.add_child(road_button)
@@ -77,7 +80,17 @@ func setup(state, owner_ui) -> void:
   var clear=ui.button("全命令を解除");clear.pressed.connect(func():action.emit("clear",i));col.add_child(clear)
   routes.append({"panel":panel,"label":label,"pause":pause,"upgrade":upgrade,"orders":orders,"append":append,"clear":clear})
  var note=ui.text("1台に最大3件の命令を設定でき、上から順に繰り返します。区間の間は空荷で移動。木材なし・満杯の区間は次の周回で再確認します。命令は運行中も編集できます。今の配送・移動を終えてから、最新の設定を命令1から反映。全解除でも積荷を届けてから待機します。休止中は反映後も休止。各車種はLv.5まで。人力・馬車はLv.5で次の車種へ更新できます。",13);note.autowrap_mode=TextServer.AUTOWRAP_WORD_SMART;body.add_child(note)
+ _allow_swipe(body)
  refresh()
+
+func _allow_swipe(node: Node) -> void:
+ # Let ScrollContainer receive drags starting on cards and buttons. Its native
+ # SCROLL_BEGIN notification cancels button presses once a swipe starts.
+ if node is Control and node.mouse_filter!=Control.MOUSE_FILTER_IGNORE:
+  node.mouse_filter=Control.MOUSE_FILTER_PASS
+ if node is BaseButton:
+  node.action_mode=BaseButton.ACTION_MODE_BUTTON_RELEASE
+ for child in node.get_children(): _allow_swipe(child)
 
 func Defs_name(index: int) -> String:
  return ["雪松","琥珀","白樺"][index]

@@ -1,0 +1,65 @@
+name: Publish focused logistics scroll fix
+on:
+  push:
+    branches: [main]
+permissions:
+  contents: read
+concurrency:
+  group: kikori-scroll-${{ github.ref }}
+  cancel-in-progress: true
+jobs:
+  ui-scroll:
+    if: contains(github.event.head_commit.message, '[ui-scroll]')
+    runs-on: ubuntu-24.04
+    timeout-minutes: 12
+    permissions:
+      pages: write
+      id-token: write
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - uses: actions/cache@v4
+        with:
+          path: /tmp/kikori-godot-tools
+          key: godot-4.5.2-linux-web-sha256-v1
+      - name: Install Godot
+        run: python3 tools/install_godot.py
+      - name: Export existing game with the UI correction
+        run: |
+          set -euo pipefail
+          export GODOT_BIN=/tmp/kikori-godot-tools/godot
+          mkdir -p build/web reports
+          "$GODOT_BIN" --headless --path . --editor --import --quit > reports/import.log 2>&1
+          "$GODOT_BIN" --headless --path . --script tools/bake_assets.gd -- --smoke-test > reports/bake.log 2>&1
+          "$GODOT_BIN" --headless --path . --editor --import --quit > reports/baked-import.log 2>&1
+          "$GODOT_BIN" --headless --path . --export-release Web build/web/index.html > reports/export.log 2>&1
+          python3 -c 'import re;from pathlib import Path;assert not any(re.search("SCRIPT ERROR|Parse Error|^ERROR:",p.read_text(),re.M) for p in Path("reports").glob("*.log"))'
+          cp web/framebuffer_guard.js build/web/framebuffer_guard.js
+          python3 tools/build_pwa.py
+      - name: Install browsers
+        run: |
+          pip install playwright==1.64.0
+          python3 -m playwright install --with-deps chromium webkit
+      - name: Check only logistics scrolling and button taps
+        env:
+          LIBGL_ALWAYS_SOFTWARE: '1'
+          WEBKIT_DISABLE_DMABUF_RENDERER: '1'
+        run: |
+          xvfb-run -a python3 tests/browser_scroll.py --engine chromium
+          xvfb-run -a python3 tests/browser_scroll.py --engine webkit
+      - uses: actions/configure-pages@v5
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: build/web/
+      - uses: actions/deploy-pages@v4
+        id: deployment
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: kikori-scroll-reports
+          path: reports/
