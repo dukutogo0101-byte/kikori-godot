@@ -68,6 +68,8 @@ func run() -> void:
  root.add_child(scene)
  await process_frame
  scene.set_process(false);scene.set_physics_process(false)
+ for character in "軽トラスタイリッシュなトラック最高到達乗換":
+  check(scene.ui.font.has_char(character.unicode_at(0)),"Vehicle label glyph exists: "+character)
  var base_nodes=scene.world.counts().nodes
  var shapes=[]
  for vehicle in scene.world.player_vehicles: shapes.append(vehicle.get_child(0).mesh)
