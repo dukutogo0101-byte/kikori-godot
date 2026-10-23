@@ -42,6 +42,13 @@ const COLLECT_RADII = [1.65,2.6,3.6,4.8,6.0,7.2,8.5]
 const TOOL_NAMES = ["手斧","長柄斧","大なた","丸のこ","大型丸のこ","双刃ハーベスター","広域ハーベスター"]
 const CARRY_CAPACITY = 128
 const WALK_SPEED = 6.5
+const PLAYER_VEHICLES = [
+ {"name":"徒歩","speed":WALK_SPEED,"capacity":CARRY_CAPACITY,"price":0},
+ {"name":"軽トラ","speed":13.0,"capacity":512,"price":20000},
+ {"name":"スタイリッシュなトラック","speed":20.0,"capacity":1536,"price":120000}
+]
+# Cargo IDs remain physical; only the visual bundle is bounded on mobile.
+const CARGO_VISUAL_LIMIT = 128
 const MAX_LEVEL = 6
 const MAX_GROUND = 160
 const PLAYER_RADIUS = 0.34

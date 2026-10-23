@@ -30,7 +30,7 @@ def run(browser,url):
     context,page,fixture=context_with(browser,'transport-ui-fixture',errors)
     try:
         page.goto(url);ready(page);tap(page,'logistics')
-        assert state(page)['version']==9 and page.evaluate('window.kikoriUi.cart_limit')==6
+        assert state(page)['version']==10 and page.evaluate('window.kikoriUi.cart_limit')==6
         before=state(page)['money']
         click(page,'cart_upgrade0');page.wait_for_function('window.kikoriState.logistics.carts[0].tier===1')
         assert state(page)['money']==before-6000 and state(page)['logistics']['carts'][0]['level']==1
@@ -95,9 +95,9 @@ def run(browser,url):
     context,page,fixture=context_with(browser,'transport-v7-fixture',errors)
     try:
         page.goto(url);ready(page)
-        assert state(page)['version']==9 and state(page)['conserved']
+        assert state(page)['version']==10 and state(page)['conserved']
         assert all(c['tier']==0 and len(c['orders'])==1 for c in state(page)['logistics']['carts'])
-        page.wait_for_timeout(3300);page.reload();ready(page);assert state(page)['version']==9 and state(page)['conserved']
+        page.wait_for_timeout(3300);page.reload();ready(page);assert state(page)['version']==10 and state(page)['conserved']
     finally:context.close()
     context,page,fixture=context_with(browser,'transport-truck-loaded-fixture',errors)
     try:

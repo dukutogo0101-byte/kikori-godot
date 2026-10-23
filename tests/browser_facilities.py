@@ -114,8 +114,8 @@ def run(browser,url):
     # A previous release's actual loaded cart and worker inventories migrate.
     context,page,fixture=context_with(browser,'production-legacy-fixture',errors)
     try:
-        page.goto(url);ready(page);assert state(page)['version']==9 and state(page)['conserved']
-        page.reload();ready(page);assert state(page)['version']==9 and state(page)['conserved']
+        page.goto(url);ready(page);assert state(page)['version']==10 and state(page)['conserved']
+        page.reload();ready(page);assert state(page)['version']==10 and state(page)['conserved']
     finally:context.close()
     assert not errors,errors
     result={'free_placement':True,'tap_upgrade':True,'three_stage_transport':True,'product_income':480,'explicit_road_confirmation':True,'touch_cancel':True,'landscape':True,'save_resume':True,'conserved':True,'errors':errors}

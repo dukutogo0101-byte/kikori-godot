@@ -4,6 +4,7 @@ const Legacy = preload("res://scripts/adventure/legacy_state.gd")
 const Logistics = preload("res://scripts/adventure/logistics.gd")
 var logistics = Logistics.new()
 var wide_view = false
+var vehicle_tier = 0
 var position = Defs.SPAWN
 var facing = Vector2(0, -1)
 var velocity = Vector2.ZERO
@@ -36,10 +37,16 @@ func _init() -> void:
   trees.append({"position": item.position, "kind": item.kind, "hp": Defs.KINDS[item.kind].hp, "regrow": 0.0, "fall": 0.0, "cycle": 0, "harvested": false, "quality": Defs.quality(item.position)})
 
 func capacity() -> int:
- return Defs.CARRY_CAPACITY
+ return Defs.PLAYER_VEHICLES[vehicle_tier].capacity
 
 func speed() -> float:
- return Defs.WALK_SPEED
+ return Defs.PLAYER_VEHICLES[vehicle_tier].speed
+
+func vehicle_name() -> String:
+ return Defs.PLAYER_VEHICLES[vehicle_tier].name
+
+func vehicle_price() -> int:
+ return Defs.PLAYER_VEHICLES[vehicle_tier+1].price if vehicle_tier<2 else 0
 
 func cut_radius() -> float:
  return Defs.CUT_RADII[levels.cut_range]
@@ -96,6 +103,7 @@ func active_projects() -> Array:
  return [Defs.PROJECTS[0],Defs.PROJECTS[2]]
 
 func price(key: String) -> int:
+ if key=="vehicle": return vehicle_price()
  if not levels.has(key): return 0
  return int(round(Defs.BASE_PRICES[key] * pow(1.65, levels[key])))
 
@@ -276,6 +284,14 @@ func sell_log(log: Dictionary, at: Vector2, automatic: bool = false) -> bool:
  return true
 
 func buy(key: String) -> bool:
+ if key=="vehicle":
+  if vehicle_tier>=2 or money<vehicle_price(): return false
+  money-=vehicle_price()
+  vehicle_tier+=1
+  if first_upgrade<0: first_upgrade=elapsed
+  events.append({"type":"upgrade","id":key})
+  notice="%sに乗り換え！ 速度 %.1f m/s · 積載 %d 本" % [vehicle_name(),speed(),capacity()]
+  return true
  if not levels.has(key) or levels[key] >= Defs.MAX_LEVEL or money < price(key): return false
  money -= price(key)
  levels[key] += 1
@@ -293,7 +309,7 @@ func conserved() -> bool:
  return true
 
 func snapshot(buffer_limit: int = -1) -> Dictionary:
- var state = {"version": 9, "migration_credit":migration_credit, "logistics": logistics.snapshot(buffer_limit), "wide_view": wide_view, "position": [position.x, position.y], "facing": [facing.x, facing.y], "money": money, "levels": levels.duplicate(), "projects": projects.duplicate(), "created": created.duplicate(), "sold": sold.duplicate(), "spent": spent.duplicate(), "next_id": next_id, "elapsed": elapsed, "timings": [first_cut,first_sale,first_upgrade,bridge_time], "trees": [], "ground": [], "bag": bag.duplicate(true)}
+ var state = {"version": 10, "vehicle_tier":vehicle_tier, "migration_credit":migration_credit, "logistics": logistics.snapshot(buffer_limit), "wide_view": wide_view, "position": [position.x, position.y], "facing": [facing.x, facing.y], "money": money, "levels": levels.duplicate(), "projects": projects.duplicate(), "created": created.duplicate(), "sold": sold.duplicate(), "spent": spent.duplicate(), "next_id": next_id, "elapsed": elapsed, "timings": [first_cut,first_sale,first_upgrade,bridge_time], "trees": [], "ground": [], "bag": bag.duplicate(true)}
  for tree in trees:
   state.trees.append({"hp": tree.hp, "regrow": tree.regrow, "fall": tree.fall, "cycle": tree.cycle})
  for log in ground:
@@ -309,8 +325,12 @@ static func pair(v) -> bool:
 func restore(data: Dictionary) -> bool:
  # Build a candidate: failures leave this game completely unchanged.
  if data.get("version")==5 or data.get("version")==6: return migrate(data)
- if data.get("version")!=7 and data.get("version")!=8 and data.get("version")!=9: return false
+ if data.get("version")!=7 and data.get("version")!=8 and data.get("version")!=9 and data.get("version")!=10: return false
  var candidate = get_script().new()
+ # Old saves start on foot; new saves must explicitly validate the vehicle.
+ var saved_vehicle=data.get("vehicle_tier") if data.get("version")==10 else 0
+ if not number(saved_vehicle,0,2,true): return false
+ candidate.vehicle_tier=int(saved_vehicle)
  for key in ["position","facing"]:
   if not pair(data.get(key)): return false
  if not number(data.get("money"),0,1e10,true) or not number(data.get("next_id"),1,1e8,true) or not number(data.get("elapsed"),0,1e9): return false
@@ -377,7 +397,7 @@ func restore(data: Dictionary) -> bool:
    candidate.get(group).append(restored)
  if not data.get("wide_view") is bool: return false
  candidate.wide_view=data.wide_view
- if not candidate.logistics.restore(candidate,data.get("logistics"),ids,total,data.get("version")==7,data.get("version")!=9): return false
+ if not candidate.logistics.restore(candidate,data.get("logistics"),ids,total,data.get("version")==7,data.get("version")<9): return false
  if not candidate.conserved(): return false
  if not data.get("timings") is Array or data.timings.size() != 4: return false
  for v in data.timings:
@@ -388,6 +408,7 @@ func restore(data: Dictionary) -> bool:
  candidate.bridge_time = float(data.timings[3])
  # Money can only come from sold logs. Validate it against recorded purchases.
  var costs = candidate.logistics.costs()
+ for tier in range(1,candidate.vehicle_tier+1): costs+=Defs.PLAYER_VEHICLES[tier].price
  for key in purchase_prices:
   for level in int(data.levels[key]): costs += int(round(purchase_prices[key] * pow(1.65,level)))
  var base_income = 0
@@ -405,7 +426,7 @@ func restore(data: Dictionary) -> bool:
  if not candidate.walkable(candidate.position): candidate.position = Defs.SPAWN
  candidate.facing = Vector2(data.facing[0],data.facing[1]).normalized()
  if candidate.facing == Vector2.ZERO: candidate.facing = Vector2(0,-1)
- for key in ["logistics","migration_credit","wide_view","position","facing","money","levels","projects","created","sold","spent","next_id","elapsed","first_cut","first_sale","first_upgrade","bridge_time","trees","ground","bag","migrated_refund"]:
+ for key in ["vehicle_tier","logistics","migration_credit","wide_view","position","facing","money","levels","projects","created","sold","spent","next_id","elapsed","first_cut","first_sale","first_upgrade","bridge_time","trees","ground","bag","migrated_refund"]:
   set(key,candidate.get(key))
  velocity = Vector2.ZERO
  target = -1
@@ -446,6 +467,7 @@ func summary() -> Dictionary:
  # Browser diagnostics contain bounded samples and exact counts; saves keep all IDs.
  var state = snapshot(256)
  state["bag_count"] = bag.size()
+ state["vehicle_name"] = vehicle_name()
  state["capacity"] = capacity()
  state["speed"] = speed()
  state["damage"] = damage()

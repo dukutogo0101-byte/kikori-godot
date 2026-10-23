@@ -11,6 +11,9 @@ var facility_preview={}
 var logistics_view
 var art = Art.new()
 var hero: Node3D
+var walker: Node3D
+var player_vehicles: Array = []
+var player_wheels: Array = []
 var body: MeshInstance3D
 var legs: Array = []
 var axe: Node3D
@@ -157,9 +160,11 @@ func setup(state, ui_font: Font) -> void:
  hero = Node3D.new()
  add_child(hero)
  hero.position = Defs.point(game.position)
- body = mesh(hero,art.hero_body())
+ walker=Node3D.new()
+ hero.add_child(walker)
+ body = mesh(walker,art.hero_body())
  for x in [-0.14,0.14]:
-  var leg = mesh(hero,art.hero_leg(),Vector3(x,0.6,0))
+  var leg = mesh(walker,art.hero_leg(),Vector3(x,0.6,0))
   legs.append(leg)
  axe = Node3D.new()
  axe.position = Vector3(0.3,1.04,0.05)
@@ -173,12 +178,22 @@ func setup(state, ui_font: Font) -> void:
     var blade=mesh(tool,art.saw_blade(),Vector3(x,0,1.05))
     saw_blades.append(blade)
   tools.append(tool)
- mesh(hero,art.cargo_frame())
+ mesh(walker,art.cargo_frame())
+ var wheel_shape=art.player_wheel()
+ for vehicle_tier in [1,2]:
+  var vehicle=Node3D.new()
+  hero.add_child(vehicle)
+  mesh(vehicle,art.player_vehicle(vehicle_tier))
+  player_vehicles.append(vehicle)
+  for x in ([-0.79,0.79] if vehicle_tier==2 else [-0.6,0.6]):
+   for z in ([-1.18,1.03] if vehicle_tier==2 else [-0.88,0.73]):
+    var wheel=mesh(vehicle,wheel_shape,Vector3(x,0.3,z))
+    player_wheels.append(wheel)
  mesh(hero,art.ring(0.5,0.08,Color("f1bc55")),Vector3(0,0.025,0))
  load_label = label(hero,"",Vector3(0,2.45,0),Color("234d67"),37)
  for kind in 3: ground_batches.append(batch(self,art.log_mesh(kind),Defs.MAX_GROUND))
  for stage in 3:
-  for kind in 3: cargo_batches.append(batch(hero,art.goods(kind,stage),Defs.CARRY_CAPACITY))
+  for kind in 3: cargo_batches.append(batch(hero,art.goods(kind,stage),Defs.CARGO_VISUAL_LIMIT))
  cut_ring=mesh(self,art.ring(1.0,0.018,Color("e1aa43")))
  collect_ring=mesh(self,art.ring(1.0,0.014,Color("5fae9e")))
  extra_target_rings=batch(self,art.ring(0.58,0.055,Color("e3ad48")),game.trees.size())
@@ -216,7 +231,10 @@ func CUT_COLOR() -> Color:
 
 func cargo_position(index: int) -> Vector3:
  # Eight small logs per layer, sixteen layers: a bounded bundle of 128 logs.
- var slot=clampi(index,0,Defs.CARRY_CAPACITY-1)
+ var slot=clampi(index,0,Defs.CARGO_VISUAL_LIMIT-1)
+ if game.vehicle_tier>0:
+  var wide=game.vehicle_tier==2
+  return Vector3((-0.48 if wide else -0.39)+(slot%4)*(0.32 if wide else 0.26),0.8+floori(float(slot)/32)*0.17,(-0.12 if wide else -0.13)-floori(float(slot%32)/4)*(0.21 if wide else 0.15))
  return Vector3(-0.27+(slot%2)*0.54,0.64+floori(float(slot)/8)*0.13,-0.43-(floori(float(slot%8)/2))*0.14)
 
 func handle(event: Dictionary) -> void:
@@ -269,6 +287,10 @@ func update(delta: float) -> void:
  hero.position = hero.position.lerp(desired,1-exp(-35*delta)) if delta>0 else desired
  var angle = atan2(game.facing.x,game.facing.y)
  hero.rotation.y = lerp_angle(hero.rotation.y,angle,1-exp(-20*delta))
+ walker.visible=game.vehicle_tier==0
+ for i in player_vehicles.size(): player_vehicles[i].visible=game.vehicle_tier==i+1
+ for wheel in player_wheels: wheel.rotation.x+=game.velocity.length()*delta/0.3
+ axe.position=Vector3(0.3,1.04,0.05) if game.vehicle_tier==0 else Vector3(0.72 if game.vehicle_tier==1 else 0.94,1.13,0.05)
  var moving = game.velocity.length() > 0.1
  var gait = sin(clock*16) if moving else 0.0
  legs[0].rotation.x = gait*0.55
@@ -282,7 +304,7 @@ func update(delta: float) -> void:
  for blade in saw_blades: blade.rotation.y=clock*(30 if game.target>=0 else 3)
  axe.rotation.z = -0.25
  load_label.text = "%d / %d%s" % [game.bag.size(),game.capacity(),"  満載" if game.bag.size()>=game.capacity() else ""]
- load_label.position.y = maxf(2.15,0.96+floori(float(maxi(0,game.bag.size()-1))/8)*0.13)
+ load_label.position.y = 2.2 if game.vehicle_tier>0 else maxf(2.15,0.96+floori(float(maxi(0,game.bag.size()-1))/8)*0.13)
  for ring in [cut_ring,collect_ring]:
   ring.visible=not planning and not show_routes
   ring.position=Defs.point(game.position,0.045 if ring==cut_ring else 0.035)
@@ -317,7 +339,7 @@ func update(delta: float) -> void:
   counts[log.kind]+=1
  for i in 3: ground_batches[i].multimesh.visible_instance_count = counts[i]
  counts = [0,0,0,0,0,0,0,0,0]
- for i in game.bag.size():
+ for i in mini(game.bag.size(),Defs.CARGO_VISUAL_LIMIT):
   var log = game.bag[i]
   if pending.has(log.id): continue
   var at = cargo_position(i)
@@ -386,4 +408,4 @@ func counts() -> Dictionary:
  for chip in chips: active+=1 if chip.age>=0 else 0
  var rendered_cargo=0
  for batch_node in cargo_batches: rendered_cargo+=batch_node.multimesh.visible_instance_count
- return {"nodes":get_child_count(),"effect_pool":effects.size()+chips.size(),"active_effects":active,"ground_instances":game.ground.size(),"cargo_instances":game.bag.size(),"rendered_cargo":rendered_cargo,"tool_tier":game.tool_tier()}
+ return {"nodes":get_child_count(),"effect_pool":effects.size()+chips.size(),"active_effects":active,"ground_instances":game.ground.size(),"cargo_instances":game.bag.size(),"rendered_cargo":rendered_cargo,"tool_tier":game.tool_tier(),"vehicle_tier":game.vehicle_tier,"vehicle_visible":0 if walker.visible else (1 if player_vehicles[0].visible else 2)}

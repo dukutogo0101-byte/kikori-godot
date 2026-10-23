@@ -13,6 +13,7 @@ var logistics_button: Button
 var logistics_panel
 var site_panel
 var root: Control
+var equipment_label: Label
 var money_label: Label
 var bag_label: Label
 var goal_label: Label
@@ -95,7 +96,7 @@ func setup(state, ui_font: Font) -> void:
  root.add_child(money_label)
  bag_label = text("荷物 0 / 128",15)
  root.add_child(bag_label)
- menu_button = button("道具")
+ menu_button = button("道具・車")
  menu_button.pressed.connect(func(): show_menu(not modal_open))
  root.add_child(menu_button)
  view_button=button("視野：広い")
@@ -152,13 +153,15 @@ func setup(state, ui_font: Font) -> void:
  var header = HBoxContainer.new()
  layout.add_child(header)
  layout.move_child(header,0)
- var title = text("道具",22)
+ var title = text("道具・車",22)
  title.size_flags_horizontal = Control.SIZE_EXPAND_FILL
  header.add_child(title)
  close_button = button("閉じる")
  close_button.pressed.connect(func(): show_menu(false))
  header.add_child(close_button)
- content.add_child(text("移動 6.5 m/s · 積載 128 本が標準装備",13,Color("678698")))
+ equipment_label=text("",13,Color("678698"))
+ equipment_label.autowrap_mode=TextServer.AUTOWRAP_WORD_SMART
+ content.add_child(equipment_label)
  for key in ["axe","cut_range","collect_range"]:
   var panel = PanelContainer.new()
   panel.add_theme_stylebox_override("panel",style(Color("e0edf2"),15))
@@ -176,6 +179,19 @@ func setup(state, ui_font: Font) -> void:
   purchase.pressed.connect(func(): upgrade_requested.emit(key))
   row.add_child(purchase)
   rows[key] = {"description":description,"button":purchase}
+ var vehicle_panel=PanelContainer.new()
+ vehicle_panel.add_theme_stylebox_override("panel",style(Color("dcece7"),15))
+ content.add_child(vehicle_panel)
+ var vehicle_layout=VBoxContainer.new()
+ vehicle_layout.add_theme_constant_override("separation",8)
+ vehicle_panel.add_child(vehicle_layout)
+ var vehicle_description=text("",15)
+ vehicle_description.autowrap_mode=TextServer.AUTOWRAP_WORD_SMART
+ vehicle_layout.add_child(vehicle_description)
+ var vehicle_purchase=button("")
+ vehicle_purchase.pressed.connect(func():upgrade_requested.emit("vehicle"))
+ vehicle_layout.add_child(vehicle_purchase)
+ rows["vehicle"]={"description":vehicle_description,"button":vehicle_purchase}
  var options = HBoxContainer.new()
  options.add_theme_constant_override("separation",8)
  content.add_child(options)
@@ -329,7 +345,19 @@ func update(delta: float, controller, camera: Camera3D) -> void:
  hint_label.text = toast_text if toast_time>0 else hint
  view_button.text="視野：最大" if game.wide_view else "視野：広い"
  if site_panel.visible: site_panel.refresh()
+ equipment_label.text="%s · 移動 %.1f m/s · 積載 %d 本" % [game.vehicle_name(),game.speed(),game.capacity()]
  for key in rows:
+  if key=="vehicle":
+   var maxed=game.vehicle_tier>=2
+   var next_vehicle=Defs.PLAYER_VEHICLES[mini(2,game.vehicle_tier+1)]
+   rows[key].description.text="車のアップグレード  %d / 2\n%s" % [game.vehicle_tier,game.vehicle_name()]
+   if not maxed:
+    rows[key].description.text+=" →\n%s\n速度 %.1f → %.1f m/s\n積載 %d → %d 本" % [next_vehicle.name,game.speed(),next_vehicle.speed,game.capacity(),next_vehicle.capacity]
+   else:
+    rows[key].description.text+="\n速度 %.1f m/s · 積載 %d 本\n最高グレードに到達！" % [game.speed(),game.capacity()]
+   rows[key].button.text="%d で購入" % game.vehicle_price() if not maxed else "MAX · 最高グレード"
+   rows[key].button.disabled=maxed or game.money<game.vehicle_price()
+   continue
   var level = game.levels[key]
   var next = mini(Defs.MAX_LEVEL,level+1)
   var effect = "威力 %d → %d" % [game.damage(),1+next] if key=="axe" else ("半径 %.1f → %.1f m" % [game.cut_radius(),Defs.CUT_RADII[next]] if key=="cut_range" else "半径 %.1f → %.1f m" % [game.collect_radius(),Defs.COLLECT_RADII[next]])

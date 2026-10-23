@@ -71,7 +71,7 @@ func _ready() -> void:
   window.addEventListener("kikori-web-modal-change",web_modal_callback)
   _visibility([])
   diagnostics()
- if restored and data.get("version")!=9: _save()
+ if restored and data.get("version")!=10: _save()
  if native_smoke:
   print("KIKORI_ADVENTURE_READY trees=%d objects=%s" % [game.trees.size(),world.counts()])
   get_tree().create_timer(2).timeout.connect(func(): get_tree().quit())

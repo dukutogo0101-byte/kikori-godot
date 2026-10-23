@@ -15,6 +15,7 @@ python3 -c 'import re,sys; from pathlib import Path; sys.exit(bool(re.search("SC
 timeout 180s "$GODOT_BIN" --headless --path . --script tests/test_direct_loop.gd 2>&1 | tee reports/direct-loop.log
 timeout 180s "$GODOT_BIN" --headless --path . --script tests/test_adventure.gd 2>&1 | tee reports/simulation.log
 timeout 180s "$GODOT_BIN" --headless --path . --script tests/test_tools.gd 2>&1 | tee reports/tools.log
+timeout 180s "$GODOT_BIN" --headless --path . --script tests/test_player_vehicles.gd -- --smoke-test 2>&1 | tee reports/player-vehicles.log
 timeout 180s "$GODOT_BIN" --headless --path . --script tests/test_automation.gd 2>&1 | tee reports/automation.log
 timeout 180s "$GODOT_BIN" --headless --path . --script tests/test_watersheds.gd 2>&1 | tee reports/watersheds.log
 timeout 180s "$GODOT_BIN" --headless --path . --script tests/test_facilities.gd 2>&1 | tee reports/facilities.log

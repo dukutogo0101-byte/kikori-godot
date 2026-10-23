@@ -385,6 +385,60 @@ func truck() -> ArrayMesh:
  box(Vector3(0,0.43,1.34),Vector3(1.18,0.12,0.12),Color("a6b8b9"))
  return finish()
 
+func player_vehicle(tier: int) -> ArrayMesh:
+ begin("player_vehicle_%d" % tier)
+ var premium=tier==2
+ var width=1.58 if premium else 1.2
+ var length=3.55 if premium else 2.65
+ var paint=Color("243e52") if premium else Color("eef3eb")
+ var trim=Color("4ed2bc") if premium else Color("a4b6b7")
+ var glass=Color("78bfd1")
+ var front=length*0.5
+ var bed_z=-0.72 if premium else -0.58
+ box(Vector3(0,0.43,0),Vector3(width,0.2,length),Color("263239"))
+ box(Vector3(0,0.66,bed_z),Vector3(width,0.15,1.85 if premium else 1.35),trim)
+ for x in [-width*0.5,width*0.5]:
+  box(Vector3(x,0.91,bed_z),Vector3(0.07,0.46,1.95 if premium else 1.4),paint)
+  box(Vector3(x,1.05,bed_z),Vector3(0.08,0.06,1.96 if premium else 1.41),trim)
+ box(Vector3(0,0.91,-front+0.08),Vector3(width,0.46,0.09),paint)
+ # A square cab-over kei truck and a longer, angular premium cab.
+ var cab_z=0.75 if premium else 0.67
+ box(Vector3(0,0.93,cab_z),Vector3(width,0.8,1.3 if premium else 1.05),paint)
+ if premium:
+  var a=Vector3(-width/2,1.25,front-0.12)
+  var b=Vector3(width/2,1.25,front-0.12)
+  var c=Vector3(width/2,1.83,front-0.6)
+  var d=Vector3(-width/2,1.83,front-0.6)
+  quad(a,b,c,d,glass)
+  quad(Vector3(-width/2,1.25,0.17),a,d,Vector3(-width/2,1.83,0.17),glass.darkened(0.2))
+  quad(b,Vector3(width/2,1.25,0.17),Vector3(width/2,1.83,0.17),c,glass.darkened(0.2))
+  box(Vector3(0,1.85,0.67),Vector3(width+0.06,0.1,1.08),paint)
+  box(Vector3(0,1.3,front-0.13),Vector3(width,0.06,0.08),trim)
+  box(Vector3(0,0.92,front-0.02),Vector3(0.86,0.27,0.05),Color("15242b"))
+  for y in [0.85,0.94,1.03]: box(Vector3(0,y,front+0.01),Vector3(0.8,0.025,0.05),trim)
+ else:
+  box(Vector3(0,1.45,cab_z),Vector3(width,0.54,1.02),paint)
+  box(Vector3(0,1.5,front-0.12),Vector3(width-0.14,0.34,0.035),glass)
+  for x in [-width*0.505,width*0.505]: box(Vector3(x,1.5,cab_z),Vector3(0.025,0.34,0.76),glass)
+  box(Vector3(0,1.76,cab_z),Vector3(width+0.05,0.1,1.08),paint)
+ for side in [-1,1]:
+  box(Vector3(side*(width/2+0.12),1.43,cab_z+0.3),Vector3(0.17,0.2,0.12),paint)
+  box(Vector3(side*(width/2-0.18),1.1,front+0.025),Vector3(0.25,0.1,0.06),Color("d6f9ff") if premium else CREAM)
+  box(Vector3(side*(width/2-0.15),0.9,-front+0.01),Vector3(0.16,0.14,0.05),Color("de654b"))
+ box(Vector3(0,0.58,front+0.06),Vector3(width+0.04,0.16,0.12),trim)
+ box(Vector3(0,0.6,front+0.13),Vector3(0.28,0.13,0.025),Color("e5c24c"))
+ return finish()
+
+func player_wheel() -> ArrayMesh:
+ begin("player_wheel")
+ branch(Vector3(-0.12,0,0),Vector3(0.12,0,0),0.3,0.3,Color("202a30"),12)
+ for side in [-1,1]:
+  branch(Vector3(side*0.12,0,0),Vector3(side*0.135,0,0),0.17,0.17,Color("a4bec8"),8)
+  for spoke in 5:
+   var angle=TAU*spoke/5
+   branch(Vector3(side*0.14,0,0),Vector3(side*0.14,cos(angle)*0.14,sin(angle)*0.14),0.025,0.025,Color("4b6978"),4)
+ return finish()
+
 func sawmill() -> ArrayMesh:
  var key="sawmill"
  if OS.has_feature("web"): return cached(key)
